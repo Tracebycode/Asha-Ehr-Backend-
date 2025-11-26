@@ -3,6 +3,7 @@
 const { hashPassword } = require("../lib/password");
 const pool = require("../lib/db");
 
+
 exports.createUser = async (req, res) => {
   const admin = req.user;
 
