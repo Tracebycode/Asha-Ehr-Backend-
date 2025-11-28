@@ -9,7 +9,7 @@ const auth = require("../middleware/auth");
 
 
 
-const familiesController = require("../controllers/familiesController");
+const familiesController = require("../controllers/familiescontroller");
 const membersController = require("../controllers/memberscontroller");
 
 
