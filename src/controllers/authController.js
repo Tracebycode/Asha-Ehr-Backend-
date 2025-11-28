@@ -1,3 +1,6 @@
+//Login controller
+
+
 const jwt = require("jsonwebtoken");
 const { comparePassword } = require("../lib/password");
 const pool = require("../lib/db");
