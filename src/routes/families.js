@@ -1,4 +1,3 @@
-console.log("FAMILIES ROUTE FILE LOADED");
 
 const express = require("express");
 const router = express.Router(); 

@@ -9,7 +9,7 @@ const taskcontroller = require("../controllers/taskcontroller");
 
 // Define your task routes here
 router.post("/create", auth, taskcontroller.createTask);
-router.get("/list", authMiddleware, taskController.listTasks);
+router.get("/list", auth, taskcontroller.listTasks);
 
 
 
