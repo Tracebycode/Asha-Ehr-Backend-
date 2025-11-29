@@ -6,7 +6,7 @@ const auth = require("../middleware/auth.js");
 
 
 
-const phcsareaController  = require("../controllers/phcareasController.js");
+const phcsareaController  = require("../controllers/phcareascontroller.js");
 // POST /phc/areas/create
 router.post("/areas/create", auth, phcsareaController.createArea);
 // GET /phc/areas/list

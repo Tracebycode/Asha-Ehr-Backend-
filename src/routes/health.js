@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const healthController = require("../controllers/healthController.js");
+const healthController = require("../controllers/healthcontroller.js");
 const auth = require("../middleware/auth.js");
 
 router.post("/add", auth, healthController.addHealthRecord);
