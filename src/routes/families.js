@@ -1,15 +1,15 @@
 
 const express = require("express");
 const router = express.Router(); 
-const auth = require("../middleware/auth");
+const auth = require("../middleware/auth.js");
 
 
 
 
 
 
-const familiesController = require("../controllers/familiescontroller");
-const membersController = require("../controllers/memberscontroller");
+const familiesController = require("../controllers/familiescontroller.js");
+const membersController = require("../controllers/memberscontroller.js");
 
 
 // GET /families/list

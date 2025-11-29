@@ -1,11 +1,11 @@
 const express = require("express");
 const router = express.Router(); 
-const auth = require("../middleware/auth");
+const auth = require("../middleware/auth.js");
 
 
 
 
-const taskcontroller = require("../controllers/taskcontroller");
+const taskcontroller = require("../controllers/taskcontroller.js");
 
 // Define your task routes here
 router.post("/create", auth, taskcontroller.createTask);

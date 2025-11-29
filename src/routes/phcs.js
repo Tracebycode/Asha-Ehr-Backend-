@@ -1,12 +1,12 @@
 
 const express = require("express");
 const router = express.Router();
-const auth = require("../middleware/auth");
+const auth = require("../middleware/auth.js");
 
 
 
 
-const phcsareaController  = require("../controllers/phcareasController");
+const phcsareaController  = require("../controllers/phcareasController.js");
 // POST /phc/areas/create
 router.post("/areas/create", auth, phcsareaController.createArea);
 // GET /phc/areas/list
