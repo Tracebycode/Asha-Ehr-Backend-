@@ -8,7 +8,7 @@ const auth = require("../middleware/auth.js");
 
 
 
-const familiesController = require("../controllers/familiescontroller.js");
+const familiesController = require("../controllers/familycontroller.js");
 const membersController = require("../controllers/memberscontroller.js");
 
 
