@@ -37,8 +37,8 @@ exports.login = async (req, res) => {
       const supQ = await pool.query(`
         SELECT u.name 
         FROM user_supervision_map m
-        JOIN users u ON u.id = m.anm_id
-        WHERE m.asha_id = $1
+        JOIN users u ON u.id = m.anm_worker_id
+        WHERE m.asha_worker_id = $1
       `, [user.id]);
 
       supervisor_name = supQ.rows[0]?.name || null;
@@ -50,8 +50,8 @@ exports.login = async (req, res) => {
       const anmQ = await pool.query(`
         SELECT u.name 
         FROM user_supervision_map m
-        JOIN users u ON u.id = m.asha_id
-        WHERE m.anm_id = $1
+        JOIN users u ON u.id = m.asha_worker_id
+        WHERE m.anm_worker_id = $1
       `, [user.id]);
 
       supervised_ashas = anmQ.rows.map(r => r.name);
@@ -66,9 +66,9 @@ exports.login = async (req, res) => {
         role: user.role,
         phc_id: user.phc_id,
 
-        areas: assigned_areas,           // AREA NAMES ARRAY
-        supervisor_name,                 // ONLY FOR ASHA
-        supervised_ashas,                // ONLY FOR ANM
+        areas: assigned_areas,     
+        supervisor_name,          
+        supervised_ashas,          
 
         status: user.status
       },
