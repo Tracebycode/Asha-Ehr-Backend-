@@ -40,14 +40,17 @@ exports.login = async (req, res) => {
 
     // ---- 2. IF ASHA → find ANM supervisor ----
     if (user.role === "asha") {
-      const supQ = await pool.query(`
-        SELECT 
-          u.id AS anm_id,
-          u.name AS anm_name
-        FROM user_supervision_map m
-        JOIN users u ON u.id = m.anm_worker_id
-        WHERE m.asha_worker_id = $1
-      `, [user.id]);
+    const supQ = await pool.query(`
+  SELECT 
+    u.id AS anm_id,
+    u.name AS anm_name
+  FROM user_supervision_map m
+  JOIN asha_workers aw ON aw.id = m.asha_worker_id
+  JOIN anm_workers anm ON anm.id = m.anm_worker_id
+  JOIN users u ON u.id = anm.user_id
+  WHERE aw.user_id = $1
+`, [user.id]);
+
 
       supervisor_id = supQ.rows[0]?.anm_id || null;
       supervisor_name = supQ.rows[0]?.anm_name || null;
