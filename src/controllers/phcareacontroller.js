@@ -1,10 +1,9 @@
 const pool = require("../lib/db");
 
-// POST /phc/areas/create
-// Only PHC ADMIN can create areas for their PHC
+// =============== CREATE AREA ==================
 exports.createArea = async (req, res) => {
   try {
-    const user = req.user; // from auth middleware
+    const user = req.user;
 
     if (user.role !== "phc_admin") {
       return res.status(403).json({ error: "Only PHC admin can create areas" });
@@ -17,9 +16,11 @@ exports.createArea = async (req, res) => {
     }
 
     const q = await pool.query(
-      `INSERT INTO phc_areas (phc_id, area_name)
-       VALUES ($1, $2)
-       RETURNING *`,
+      `
+      INSERT INTO phc_areas (phc_id, area_name, created_at, updated_at)
+      VALUES ($1, $2, NOW(), NOW())
+      RETURNING *
+      `,
       [user.phc_id, area_name.trim()]
     );
 
@@ -27,6 +28,7 @@ exports.createArea = async (req, res) => {
       message: "Area created successfully",
       area: q.rows[0],
     });
+
   } catch (err) {
     console.error("createArea ERROR:", err);
     return res.status(500).json({ error: "Server error", details: err.message });
@@ -34,14 +36,14 @@ exports.createArea = async (req, res) => {
 };
 
 
-
+// =============== LIST AREAS ==================
 exports.listAreas = async (req, res) => {
   try {
     const user = req.user;
-    let query = "";
-    let params = [];
+    let query;
+    let params;
 
-    // PHC ADMIN + DOCTOR: see all areas in their PHC
+    // PHC ADMIN and DOCTOR → list all areas under same PHC
     if (user.role === "phc_admin" || user.role === "doctor") {
       query = `
         SELECT *
@@ -52,26 +54,25 @@ exports.listAreas = async (req, res) => {
       params = [user.phc_id];
     }
 
-    // ANM or ASHA: see only assigned areas
+    // ANM or ASHA → list only assigned areas
     else if (user.role === "anm" || user.role === "asha") {
       query = `
         SELECT a.*
         FROM phc_areas a
-        JOIN user_area_map uam
-          ON uam.area_id = a.id
+        JOIN user_area_map uam ON uam.area_id = a.id
         WHERE uam.user_id = $1
         ORDER BY a.area_name ASC
       `;
-      // JWT me "sub" me users.id aa raha hai
       params = [user.sub];
     }
 
     else {
-      return res.status(403).json({ error: "Unknown role" });
+      return res.status(403).json({ error: "Unauthorized role" });
     }
 
     const q = await pool.query(query, params);
     return res.json({ areas: q.rows });
+
   } catch (err) {
     console.error("listAreas ERROR:", err);
     return res.status(500).json({ error: "Server error", details: err.message });
