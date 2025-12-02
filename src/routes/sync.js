@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const sync = require("../controllers/syncFamiliesController");
+const sync = require("../controllers/syncfamiliescontroller");
 const auth = require("../middleware/auth");
 
 router.post("/families/push", auth, sync.pushFamilies);
