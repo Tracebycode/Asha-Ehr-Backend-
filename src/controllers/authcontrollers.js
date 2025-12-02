@@ -18,19 +18,24 @@ exports.login = async (req, res) => {
     if (!ok) return res.status(401).json({ error: "Invalid credentials" });
 
     // Prepare profile enrichment
-    let worker_id = null;
     let supervisor_name = null;
     let assigned_areas = [];
+    let supervised_ashas = [];
 
-    // ---- 1. GET ASSIGNED AREAS ----
+    // ---- 1. GET ASSIGNED AREAS WITH ID + NAME ----
     const areaQ = await pool.query(`
-      SELECT a.area_name 
+      SELECT 
+        a.id AS area_id,
+        a.area_name AS area_name
       FROM user_area_map m 
       JOIN phc_areas a ON m.area_id = a.id
       WHERE m.user_id = $1
     `, [user.id]);
 
-    assigned_areas = areaQ.rows.map(r => r.area_name);
+    assigned_areas = areaQ.rows.map(r => ({
+      id: r.area_id,
+      name: r.area_name
+    }));
 
     // ---- 2. IF ASHA → find ANM supervisor ----
     if (user.role === "asha") {
@@ -45,7 +50,6 @@ exports.login = async (req, res) => {
     }
 
     // ---- 3. IF ANM → find list of ASHA workers ----
-    let supervised_ashas = [];
     if (user.role === "anm") {
       const anmQ = await pool.query(`
         SELECT u.name 
@@ -66,9 +70,9 @@ exports.login = async (req, res) => {
         role: user.role,
         phc_id: user.phc_id,
 
-        areas: assigned_areas,     
-        supervisor_name,          
-        supervised_ashas,          
+        areas: assigned_areas,      // [{id, name}]
+        supervisor_name,            // Only if ASHA
+        supervised_ashas,           // Only if ANM
 
         status: user.status
       },
