@@ -38,16 +38,19 @@ exports.login = async (req, res) => {
     }));
 
     // ---- 2. IF ASHA → find ANM supervisor ----
-    if (user.role === "asha") {
-      const supQ = await pool.query(`
-        SELECT u.name 
-        FROM user_supervision_map m
-        JOIN users u ON u.id = m.anm_worker_id
-        WHERE m.asha_worker_id = $1
-      `, [user.id]);
+  if (user.role === "asha") {
+  const supQ = await pool.query(`
+    SELECT 
+      u.id AS anm_id,
+      u.name AS anm_name
+    FROM user_supervision_map m
+    JOIN users u ON u.id = m.anm_worker_id
+    WHERE m.asha_worker_id = $1
+  `, [user.id]);
 
-      supervisor_name = supQ.rows[0]?.name || null;
-    }
+  supervisor_id = supQ.rows[0]?.anm_id || null;
+  supervisor_name = supQ.rows[0]?.anm_name || null;
+}
 
     // ---- 3. IF ANM → find list of ASHA workers ----
     if (user.role === "anm") {
