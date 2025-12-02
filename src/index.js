@@ -21,6 +21,7 @@ app.use("/families", require("./routes/families"));
 app.use("/phcs", require("./routes/phcs"));
 app.use("/health", require("./routes/health"));
 app.use("/tasks", require("./routes/task"));
+app.use("/sync", require("./routes/sync"))
 
 
 
