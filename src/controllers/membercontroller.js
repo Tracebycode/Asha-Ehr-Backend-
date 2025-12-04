@@ -33,10 +33,9 @@ exports.addMember = async (req, res) => {
       });
     }
 
-    // 4) Check duplicate Aadhar in same PHC (optional but recommended)
+    // 4) Check duplicate Aadhar anywhere (avoid duplicate)
     const duplicate = await pool.query(
-      `SELECT id FROM family_members 
-       WHERE adhar_number = $1`,
+      `SELECT id FROM family_members WHERE adhar_number = $1`,
       [adhar_number]
     );
 
@@ -46,19 +45,19 @@ exports.addMember = async (req, res) => {
       });
     }
 
-    // 5) Verify that the family belongs to THIS ASHA
-    // const fam = await pool.query(
-    //   `SELECT id, head_member_id 
-    //    FROM families 
-    //    WHERE id = $1 AND asha_worker_id = $2`,
-    //   [family_id, user.asha_id]
-    // );
+    // 5) Verify that this family belongs to THIS ASHA
+    const fam = await pool.query(
+      `SELECT id, head_member_id 
+       FROM families 
+       WHERE id = $1 AND asha_worker_id = $2`,
+      [family_id, user.asha_id]
+    );
 
-    // if (fam.rowCount === 0) {
-    //   return res.status(403).json({
-    //     error: "This family does not belong to this ASHA"
-    //   });
-    // }
+    if (fam.rowCount === 0) {
+      return res.status(403).json({
+        error: "This family does not belong to this ASHA"
+      });
+    }
 
     // 6) Insert the member
     const memberInsert = await pool.query(
@@ -71,8 +70,12 @@ exports.addMember = async (req, res) => {
 
     const member = memberInsert.rows[0];
 
-    // 7) If no head OR relation="head", set this as head
-    if (!fam.rows[0].head_member_id || relation?.toLowerCase() === "head") {
+    // 7) Set as head only if none exists OR relation="head"
+    const isHead =
+      !fam.rows[0].head_member_id ||
+      relation?.toLowerCase() === "head";
+
+    if (isHead) {
       await pool.query(
         `UPDATE families
          SET head_member_id = $1
@@ -94,7 +97,6 @@ exports.addMember = async (req, res) => {
     });
   }
 };
-
 
 
 exports.getMembersByFamily = async (req, res) => {
