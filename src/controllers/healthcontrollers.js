@@ -4,7 +4,7 @@ exports.addHealthRecord = async (req, res) => {
   try {
     const user = req.user;
 
-    // 1️⃣ Only ASHA can add health records
+    // 1️⃣ Only ASHA allowed
     if (user.role !== "asha") {
       return res.status(403).json({ error: "Only ASHA can add health records" });
     }
@@ -18,34 +18,47 @@ exports.addHealthRecord = async (req, res) => {
       });
     }
 
-    // 3️⃣ Check if member belongs to ASHA's family
-    const family = await pool.query(
-      `SELECT f.area_id, f.anm_worker_id 
+    // 3️⃣ Fetch member + family + area + ANM_details
+    const info = await pool.query(
+      `SELECT 
+         m.family_id,
+         f.area_id,
+         f.phc_id,
+         f.asha_worker_id,
+         f.anm_worker_id
        FROM family_members m
-       JOIN families f ON m.family_id = f.id
+       JOIN families f ON f.id = m.family_id
        WHERE m.id = $1 AND f.asha_worker_id = $2`,
       [member_id, user.asha_worker_id]
     );
 
-    if (family.rowCount === 0) {
+    if (info.rowCount === 0) {
       return res.status(403).json({
         error: "This member does not belong to this ASHA"
       });
     }
 
-    const area_id = family.rows[0].area_id;
-    const anm_id = family.rows[0].anm_worker_id;
+    const data = info.rows[0];
+
+    // AUTO-FILL everything
+    const phc_id = data.phc_id;
+    const family_id = data.family_id;
+    const area_id = data.area_id;
+    const anm_id = data.anm_worker_id;
+    const asha_id = data.asha_worker_id; // always same as user.asha_worker_id
 
     // 4️⃣ Insert health record
     const insert = await pool.query(
-      `INSERT INTO health_records 
-      (phc_id, member_id, asha_worker_id, anm_worker_id, area_id, task_id, visit_type, data_json)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+      `INSERT INTO health_records
+        (phc_id, member_id, asha_worker_id, anm_worker_id, 
+         area_id, task_id, visit_type, data_json, 
+         device_created_at, device_updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8, NOW(), NOW())
        RETURNING *`,
       [
-        user.phc_id,
+        phc_id,
         member_id,
-        user.asha_id,
+        asha_id,
         anm_id,
         area_id,
         task_id || null,
@@ -64,7 +77,6 @@ exports.addHealthRecord = async (req, res) => {
     return res.status(500).json({ error: err.message });
   }
 };
-
 
 exports.getByMember = async (req, res) => {
   try {
