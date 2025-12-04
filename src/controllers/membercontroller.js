@@ -46,12 +46,12 @@ exports.addMember = async (req, res) => {
     }
 
     // 5) Verify that this family belongs to THIS ASHA
-    const fam = await pool.query(
-      `SELECT id, head_member_id 
-       FROM families 
-       WHERE id = $1 AND asha_worker_id = $2`,
-      [family_id, user.asha_id]
-    );
+   const fam = await pool.query(
+  `SELECT id, head_member_id 
+   FROM families 
+   WHERE id = $1 AND asha_worker_id = $2`,
+  [family_id, user.asha_worker_id]
+);
 
     if (fam.rowCount === 0) {
       return res.status(403).json({
