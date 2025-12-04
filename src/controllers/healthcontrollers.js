@@ -24,7 +24,7 @@ exports.addHealthRecord = async (req, res) => {
        FROM family_members m
        JOIN families f ON m.family_id = f.id
        WHERE m.id = $1 AND f.asha_worker_id = $2`,
-      [member_id, user.asha_id]
+      [member_id, user.asha_worker_id]
     );
 
     if (family.rowCount === 0) {
