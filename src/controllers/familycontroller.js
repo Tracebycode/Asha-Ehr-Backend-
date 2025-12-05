@@ -218,3 +218,128 @@ exports.setHead = async (req, res) => {
     return res.status(500).json({ error: "Server error", details: err.message });
   }
 };
+
+exports.getFullFamily = async (req, res) => {
+  try {
+    const user = req.user;
+    const family_id = req.params.id;
+
+    if (!family_id) {
+      return res.status(400).json({ error: "family_id is required" });
+    }
+
+    // 1️⃣ Check permission (ASHA can fetch only their families)
+    const famCheck = await pool.query(
+      `
+      SELECT *
+      FROM families
+      WHERE id = $1 AND asha_worker_id = $2
+      `,
+      [family_id, user.asha_worker_id]
+    );
+
+    if (famCheck.rowCount === 0) {
+      return res.status(403).json({ error: "You are not allowed to view this family" });
+    }
+
+    const family = famCheck.rows[0];
+
+    // 2️⃣ Fetch members
+    const membersResult = await pool.query(
+      `SELECT * FROM family_members WHERE family_id = $1`,
+      [family_id]
+    );
+
+    const members = membersResult.rows;
+
+    // 3️⃣ Fetch all health records of these members
+    const memberIds = members.map(m => m.id);
+
+    let healthRecords = [];
+    if (memberIds.length > 0) {
+      const hr = await pool.query(
+        `
+        SELECT *
+        FROM health_records
+        WHERE member_id = ANY($1)
+        ORDER BY created_at DESC
+        `,
+        [memberIds]
+      );
+      healthRecords = hr.rows;
+    }
+
+    return res.json({
+      family,
+      members,
+      health_records: healthRecords
+    });
+
+  } catch (err) {
+    console.error("getFullFamily ERROR:", err);
+    return res.status(500).json({ error: "Server error", details: err.message });
+  }
+};
+
+exports.searchFamilies = async (req, res) => {
+  try {
+    const user = req.user;
+
+    // Only ASHA can use this endpoint
+    if (user.role !== "asha") {
+      return res.status(403).json({ error: "Only ASHA can search families" });
+    }
+
+    // Query params
+    const search = req.query.search ? `%${req.query.search}%` : "%%";
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const offset = (page - 1) * limit;
+
+    // 🔹 Lightweight family list
+    // Includes: id, address, landmark, updated_at, head_member_name & phone
+    const query = `
+      SELECT 
+        f.id,
+        f.address_line,
+        f.landmark,
+        f.updated_at,
+        hm.name AS head_name,
+        hm.phone AS head_phone
+      FROM families f
+      LEFT JOIN family_members hm
+        ON f.head_member_id = hm.id
+      WHERE f.asha_worker_id = $1
+        AND (
+             hm.name ILIKE $2 OR
+             hm.phone ILIKE $2 OR
+             f.address_line ILIKE $2 OR
+             CAST(f.id AS TEXT) ILIKE $2
+        )
+      ORDER BY f.updated_at DESC
+      LIMIT $3 OFFSET $4
+    `;
+
+    const result = await pool.query(query, [
+      user.asha_worker_id,
+      search,
+      limit,
+      offset
+    ]);
+
+    return res.json({
+      page,
+      limit,
+      count: result.rowCount,
+      families: result.rows,
+    });
+
+  } catch (err) {
+    console.error("searchFamilies ERROR:", err);
+    return res.status(500).json({
+  error: "Server error",
+  details: err?.message || String(err),
+});
+
+  }
+};
