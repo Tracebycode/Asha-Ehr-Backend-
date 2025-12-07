@@ -5,6 +5,6 @@ const { authMiddleware } = require("../middleware/auth");
 const { updateAshaEntity } = require("../controllers/Update");
 
 // Unified update route
-router.put("/asha/update", authMiddleware, updateAshaEntity);
+router.put("/update", authMiddleware, updateAshaEntity);
 
 module.exports = router;

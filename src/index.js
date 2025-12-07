@@ -13,7 +13,7 @@ app.use(cors());
 app.use(express.json());
 
 // ⭐ ADD THIS FIRST
-app.use("/update", require("./routes/ashaUpdate"));
+app.use("/ashaUpdate", require("./routes/ashaUpdate"));
 
 // Login route
 app.post("/auth/login", authController.login);
