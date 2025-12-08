@@ -217,4 +217,39 @@ exports.getAnmDetails = async (req, res) => {
     console.error("Error:", error);
     res.status(500).json({ error: "Server error" });
   }
+
+// =======================
+// 6. ASHA SUMMARY (counts)
+// =======================
+exports.getAshaSummary = async (req, res) => {
+  try {
+    // PHC admin only – you already checked role in auth or can reuse ensurePhcAdmin
+    if (!req.user || req.user.role !== "phc_admin") {
+      return res.status(403).json({ error: "Access denied: PHC admin only" });
+    }
+
+    const phcId = req.user.phc_id;
+
+    const query = `
+      SELECT
+        COUNT(*)::int AS total_ashas,
+        COUNT(*) FILTER (WHERE u.status = 'active')::int AS active_ashas,
+        COUNT(*) FILTER (WHERE u.status <> 'active')::int AS disabled_ashas
+      FROM asha_workers aw
+      JOIN users u ON u.id = aw.user_id
+      WHERE u.phc_id = $1;
+    `;
+
+    const { rows } = await pool.query(query, [phcId]);
+    const stats = rows[0] || {
+      total_ashas: 0,
+      active_ashas: 0,
+      disabled_ashas: 0,
+    };
+
+    return res.json(stats);
+  } catch (error) {
+    console.error("getAshaSummary ERROR:", error);
+    res.status(500).json({ error: "Server error" });
+  }
 };
