@@ -25,6 +25,9 @@ app.use("/phcs", require("./routes/phcs"));
 app.use("/health", require("./routes/health"));
 app.use("/tasks", require("./routes/task"));
 app.use("/sync", require("./routes/sync"))
+app.use("/phc", require("./routes/phcAdmin"));
+
+
 
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => console.log("Server running on port", PORT));
