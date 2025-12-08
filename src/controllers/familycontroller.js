@@ -81,34 +81,41 @@ exports.listFamilies = async (req, res) => {
     const user = req.user;
     let query, params;
 
-    // PHC ADMIN sees all families in PHC
+    // PHC ADMIN
     if (user.role === "phc_admin") {
       query = `
-        SELECT * FROM families
-        WHERE phc_id = $1
-        ORDER BY created_at DESC
+        SELECT f.*, fm.name AS head_name
+        FROM families f
+        LEFT JOIN family_members fm
+          ON fm.id = f.head_member_id
+        WHERE f.phc_id = $1
+        ORDER BY f.created_at DESC
       `;
       params = [user.phc_id];
     }
 
-    // ANM sees families supervised by them
+    // ANM
     else if (user.role === "anm") {
       query = `
-        SELECT *
-        FROM families
-        WHERE anm_worker_id = $1
-        ORDER BY created_at DESC
+        SELECT f.*, fm.name AS head_name
+        FROM families f
+        LEFT JOIN family_members fm
+          ON fm.id = f.head_member_id
+        WHERE f.anm_worker_id = $1
+        ORDER BY f.created_at DESC
       `;
       params = [user.anm_worker_id];
     }
 
-    // ASHA sees only their families
+    // ASHA
     else if (user.role === "asha") {
       query = `
-        SELECT *
-        FROM families
-        WHERE asha_worker_id = $1
-        ORDER BY created_at DESC
+        SELECT f.*, fm.name AS head_name
+        FROM families f
+        LEFT JOIN family_members fm
+          ON fm.id = f.head_member_id
+        WHERE f.asha_worker_id = $1
+        ORDER BY f.created_at DESC
       `;
       params = [user.asha_worker_id];
     }
@@ -122,9 +129,13 @@ exports.listFamilies = async (req, res) => {
 
   } catch (err) {
     console.error("listFamilies ERROR:", err);
-    return res.status(500).json({ error: "Server error", details: err.message });
+    return res.status(500).json({
+      error: "Server error",
+      details: err.message
+    });
   }
 };
+
 
 
 
