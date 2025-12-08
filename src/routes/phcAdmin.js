@@ -25,4 +25,12 @@ router.get("/anms", auth, phcOnly, phcAdminController.getAllAnmWorkers);
 // ANM FULL DETAILS
 router.get("/anms/:anmId", auth, phcOnly, phcAdminController.getAnmDetails);
 
+
+//get asha summary / count
+router.get(
+  "/ashas/summary",
+  auth,
+  phcAdminController.getAshaSummary
+);
+
 module.exports = router;
