@@ -72,7 +72,6 @@ exports.createFamily = async (req, res) => {
   }
 };
 
-
 /* =======================================================
    LIST FAMILIES (role-based)
    ======================================================= */
@@ -81,34 +80,41 @@ exports.listFamilies = async (req, res) => {
     const user = req.user;
     let query, params;
 
-    // PHC ADMIN sees all families in PHC
+    // PHC ADMIN
     if (user.role === "phc_admin") {
       query = `
-        SELECT * FROM families
-        WHERE phc_id = $1
-        ORDER BY created_at DESC
+        SELECT f.*, fm.name AS head_name
+        FROM families f
+        LEFT JOIN family_members fm
+          ON fm.id = f.head_member_id
+        WHERE f.phc_id = $1
+        ORDER BY f.created_at DESC
       `;
       params = [user.phc_id];
     }
 
-    // ANM sees families supervised by them
+    // ANM
     else if (user.role === "anm") {
       query = `
-        SELECT *
-        FROM families
-        WHERE anm_worker_id = $1
-        ORDER BY created_at DESC
+        SELECT f.*, fm.name AS head_name
+        FROM families f
+        LEFT JOIN family_members fm
+          ON fm.id = f.head_member_id
+        WHERE f.anm_worker_id = $1
+        ORDER BY f.created_at DESC
       `;
       params = [user.anm_worker_id];
     }
 
-    // ASHA sees only their families
+    // ASHA
     else if (user.role === "asha") {
       query = `
-        SELECT *
-        FROM families
-        WHERE asha_worker_id = $1
-        ORDER BY created_at DESC
+        SELECT f.*, fm.name AS head_name
+        FROM families f
+        LEFT JOIN family_members fm
+          ON fm.id = f.head_member_id
+        WHERE f.asha_worker_id = $1
+        ORDER BY f.created_at DESC
       `;
       params = [user.asha_worker_id];
     }
@@ -122,14 +128,15 @@ exports.listFamilies = async (req, res) => {
 
   } catch (err) {
     console.error("listFamilies ERROR:", err);
-    return res.status(500).json({ error: "Server error", details: err.message });
+    return res.status(500).json({
+      error: "Server error",
+      details: err.message
+    });
   }
 };
 
-
-
 /* =======================================================
-   SET HEAD OF FAMILY (role-based permission)
+   SET HEAD OF FAMILY (role based)
    ======================================================= */
 exports.setHead = async (req, res) => {
   try {
@@ -142,7 +149,7 @@ exports.setHead = async (req, res) => {
 
     let famCheckQuery, params;
 
-    // ASHA -> only their own families
+    // ASHA -> own families only
     if (user.role === "asha") {
       famCheckQuery = `
         SELECT id FROM families
@@ -162,7 +169,7 @@ exports.setHead = async (req, res) => {
       params = [family_id, user.anm_worker_id];
     }
 
-    // PHC ADMIN -> any family in PHC
+    // PHC ADMIN -> all families in PHC
     else if (user.role === "phc_admin") {
       famCheckQuery = `
         SELECT id FROM families
@@ -175,14 +182,14 @@ exports.setHead = async (req, res) => {
       return res.status(403).json({ error: "Invalid role" });
     }
 
-    // 1️⃣ Permission Check
+    // Permission Check
     const famCheck = await pool.query(famCheckQuery, params);
 
     if (famCheck.rowCount === 0) {
       return res.status(403).json({ error: "Not allowed to modify this family" });
     }
 
-    // 2️⃣ Confirm member belongs to this family
+    // Confirm member belongs to this family
     const memberCheck = await pool.query(
       `
       SELECT id FROM family_members
@@ -197,7 +204,7 @@ exports.setHead = async (req, res) => {
       });
     }
 
-    // 3️⃣ Update head
+    // Update head
     await pool.query(
       `
       UPDATE families
@@ -219,6 +226,9 @@ exports.setHead = async (req, res) => {
   }
 };
 
+/* =======================================================
+   FULL FAMILY BUNDLE
+   ======================================================= */
 exports.getFullFamily = async (req, res) => {
   try {
     const user = req.user;
@@ -228,44 +238,22 @@ exports.getFullFamily = async (req, res) => {
       return res.status(400).json({ error: "family_id is required" });
     }
 
-    // 1️⃣ Check permission (role-based)
-    let famCheck;
+    // 1️⃣ Permission Check
+    const famCheck = await pool.query(
+      `
+      SELECT 
+        f.*,
+        hm.name AS head_name,
+        hm.phone AS head_phone
+      FROM families f
+      LEFT JOIN family_members hm
+        ON f.head_member_id = hm.id
+      WHERE f.id = $1 AND f.asha_worker_id = $2
+      `,
+      [family_id, user.asha_worker_id]   // FIXED
+    );
 
-    if (user.role === "phc_admin") {
-      // PHC admin can view families within their PHC
-      famCheck = await pool.query(
-        `
-        SELECT *
-        FROM families
-        WHERE id = $1 AND phc_id = $2
-        `,
-        [family_id, user.phc_id]
-      );
-    } else if (user.role === "anm") {
-      // ANM can view families they supervise
-      famCheck = await pool.query(
-        `
-        SELECT *
-        FROM families
-        WHERE id = $1 AND anm_worker_id = $2
-        `,
-        [family_id, user.anm_worker_id]
-      );
-    } else if (user.role === "asha") {
-      // ASHA can view only their families
-      famCheck = await pool.query(
-        `
-        SELECT *
-        FROM families
-        WHERE id = $1 AND asha_worker_id = $2
-        `,
-        [family_id, user.asha_worker_id]
-      );
-    } else {
-      return res.status(403).json({ error: "You are not allowed to view this family" });
-    }
-
-    if (!famCheck || famCheck.rowCount === 0) {
+    if (famCheck.rowCount === 0) {
       return res.status(403).json({ error: "You are not allowed to view this family" });
     }
 
@@ -273,16 +261,16 @@ exports.getFullFamily = async (req, res) => {
 
     // 2️⃣ Fetch members
     const membersResult = await pool.query(
-      SELECT * FROM family_members WHERE family_id = $1,
+      `SELECT * FROM family_members WHERE family_id = $1 ORDER BY created_at ASC`,
       [family_id]
     );
 
     const members = membersResult.rows;
 
-    // 3️⃣ Fetch all health records of these members
+    // 3️⃣ Fetch health records
     const memberIds = members.map(m => m.id);
-
     let healthRecords = [];
+
     if (memberIds.length > 0) {
       const hr = await pool.query(
         `
@@ -308,23 +296,22 @@ exports.getFullFamily = async (req, res) => {
   }
 };
 
+/* =======================================================
+   SEARCH FAMILIES (ASHA only)
+   ======================================================= */
 exports.searchFamilies = async (req, res) => {
   try {
     const user = req.user;
 
-    // Only ASHA can use this endpoint
     if (user.role !== "asha") {
       return res.status(403).json({ error: "Only ASHA can search families" });
     }
 
-    // Query params
-    const search = req.query.search ? %${req.query.search}% : "%%";
+    const search = req.query.search ? `%${req.query.search}%` : "%%";
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
     const offset = (page - 1) * limit;
 
-    // 🔹 Lightweight family list
-    // Includes: id, address, landmark, updated_at, head_member_name & phone
     const query = `
       SELECT 
         f.id,
@@ -338,17 +325,17 @@ exports.searchFamilies = async (req, res) => {
         ON f.head_member_id = hm.id
       WHERE f.asha_worker_id = $1
         AND (
-             hm.name ILIKE $2 OR
-             hm.phone ILIKE $2 OR
-             f.address_line ILIKE $2 OR
-             CAST(f.id AS TEXT) ILIKE $2
+          hm.name ILIKE $2 OR
+          hm.phone ILIKE $2 OR
+          f.address_line ILIKE $2 OR
+          CAST(f.id AS TEXT) ILIKE $2
         )
       ORDER BY f.updated_at DESC
       LIMIT $3 OFFSET $4
     `;
 
     const result = await pool.query(query, [
-      user.asha_worker_id,
+      user.asha_worker_id,  // FIXED
       search,
       limit,
       offset
@@ -364,9 +351,8 @@ exports.searchFamilies = async (req, res) => {
   } catch (err) {
     console.error("searchFamilies ERROR:", err);
     return res.status(500).json({
-  error: "Server error",
-  details: err?.message || String(err),
-});
-
+      error: "Server error",
+      details: err?.message || String(err),
+    });
   }
 };
