@@ -1,6 +1,6 @@
 exports.phcOnly = (req, res, next) => {
-  if (req.user.role !== "phc") {
-    return res.status(403).json({ error: "Access denied: PHC only" });
+  if (req.user.role !== "phc_admin") {
+    return res.status(403).json({ error: "Access denied: PHC Admin only" });
   }
   next();
 };
