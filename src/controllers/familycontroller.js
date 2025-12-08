@@ -242,11 +242,16 @@ exports.getFullFamily = async (req, res) => {
     // 1️⃣ Check permission (ASHA can fetch only their families)
     const famCheck = await pool.query(
       `
-      SELECT *
-      FROM families
-      WHERE id = $1 AND asha_worker_id = $2
+      SELECT 
+        f.*,
+        hm.name AS head_name,
+        hm.phone AS head_phone
+      FROM families f
+      LEFT JOIN family_members hm
+        ON f.head_member_id = hm.id
+      WHERE f.id = $1 AND f.asha_worker_id = $2
       `,
-      [family_id, user.asha_worker_id]
+      [family_id, user.id] // ✅ FIXED — use user.id
     );
 
     if (famCheck.rowCount === 0) {
@@ -257,7 +262,7 @@ exports.getFullFamily = async (req, res) => {
 
     // 2️⃣ Fetch members
     const membersResult = await pool.query(
-      `SELECT * FROM family_members WHERE family_id = $1`,
+      `SELECT * FROM family_members WHERE family_id = $1 ORDER BY created_at ASC`,
       [family_id]
     );
 
@@ -292,6 +297,7 @@ exports.getFullFamily = async (req, res) => {
   }
 };
 
+
 exports.searchFamilies = async (req, res) => {
   try {
     const user = req.user;
@@ -307,8 +313,7 @@ exports.searchFamilies = async (req, res) => {
     const limit = parseInt(req.query.limit) || 20;
     const offset = (page - 1) * limit;
 
-    // 🔹 Lightweight family list
-    // Includes: id, address, landmark, updated_at, head_member_name & phone
+    // Lightweight family list
     const query = `
       SELECT 
         f.id,
@@ -320,7 +325,7 @@ exports.searchFamilies = async (req, res) => {
       FROM families f
       LEFT JOIN family_members hm
         ON f.head_member_id = hm.id
-      WHERE f.asha_worker_id = $1
+      WHERE f.asha_worker_id = $1   -- ✅ FIXED
         AND (
              hm.name ILIKE $2 OR
              hm.phone ILIKE $2 OR
@@ -332,7 +337,7 @@ exports.searchFamilies = async (req, res) => {
     `;
 
     const result = await pool.query(query, [
-      user.asha_worker_id,
+      user.id,   // ✅ FIXED
       search,
       limit,
       offset
@@ -348,9 +353,8 @@ exports.searchFamilies = async (req, res) => {
   } catch (err) {
     console.error("searchFamilies ERROR:", err);
     return res.status(500).json({
-  error: "Server error",
-  details: err?.message || String(err),
-});
-
+      error: "Server error",
+      details: err?.message || String(err),
+    });
   }
 };
