@@ -218,6 +218,7 @@ exports.getAnmDetails = async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 
+};
 // =======================
 // 6. ASHA SUMMARY (counts)
 // =======================
