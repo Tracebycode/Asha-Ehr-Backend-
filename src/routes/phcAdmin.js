@@ -1,21 +1,28 @@
 const express = require("express");
 const router = express.Router();
+
 const { phcOnly } = require("../middleware/authMiddleware");
 const phcAdminController = require("../controllers/phcAdminController");
+const auth = require("../middleware/auth");
 
 // ASHA LIST
-router.get("/ashas", phcOnly, phcAdminController.getAllAshaWorkers);
+router.get("/ashas", auth, phcOnly, phcAdminController.getAllAshaWorkers);
 
 // ASHA FULL DETAILS
-router.get("/ashas/:ashaId", phcOnly, phcAdminController.getAshaDetails);
+router.get("/ashas/:ashaId", auth, phcOnly, phcAdminController.getAshaDetails);
 
 // ASHA STATUS UPDATE (active/inactive)
-router.put("/ashas/:ashaId/status", phcOnly, phcAdminController.updateAshaStatus);
+router.put(
+  "/ashas/:ashaId/status",
+  auth,
+  phcOnly,
+  phcAdminController.updateAshaStatus
+);
 
 // ANM LIST
-router.get("/anms", phcOnly, phcAdminController.getAllAnmWorkers);
+router.get("/anms", auth, phcOnly, phcAdminController.getAllAnmWorkers);
 
 // ANM FULL DETAILS
-router.get("/anms/:anmId", phcOnly, phcAdminController.getAnmDetails);
+router.get("/anms/:anmId", auth, phcOnly, phcAdminController.getAnmDetails);
 
 module.exports = router;
