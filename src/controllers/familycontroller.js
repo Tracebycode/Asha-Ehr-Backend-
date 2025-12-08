@@ -80,10 +80,13 @@ exports.listFamilies = async (req, res) => {
     const user = req.user;
     let query, params;
 
-    // PHC ADMIN
+    // 1️⃣ PHC Admin → all families under PHC
     if (user.role === "phc_admin") {
       query = `
-        SELECT f.*, fm.name AS head_name
+        SELECT 
+          f.*,
+          fm.name AS head_name,
+          fm.phone AS head_phone
         FROM families f
         LEFT JOIN family_members fm
           ON fm.id = f.head_member_id
@@ -93,10 +96,13 @@ exports.listFamilies = async (req, res) => {
       params = [user.phc_id];
     }
 
-    // ANM
+    // 2️⃣ ANM → families of supervised ASHAs
     else if (user.role === "anm") {
       query = `
-        SELECT f.*, fm.name AS head_name
+        SELECT 
+          f.*,
+          fm.name AS head_name,
+          fm.phone AS head_phone
         FROM families f
         LEFT JOIN family_members fm
           ON fm.id = f.head_member_id
@@ -106,17 +112,20 @@ exports.listFamilies = async (req, res) => {
       params = [user.anm_worker_id];
     }
 
-    // ASHA
+    // 3️⃣ ASHA → only her families
     else if (user.role === "asha") {
       query = `
-        SELECT f.*, fm.name AS head_name
+        SELECT 
+          f.*,
+          fm.name AS head_name,
+          fm.phone AS head_phone
         FROM families f
         LEFT JOIN family_members fm
           ON fm.id = f.head_member_id
         WHERE f.asha_worker_id = $1
         ORDER BY f.created_at DESC
       `;
-      params = [user.asha_worker_id];
+      params = [user.asha_worker_id];   // ✔ Correct worker ID
     }
 
     else {
@@ -124,7 +133,10 @@ exports.listFamilies = async (req, res) => {
     }
 
     const q = await pool.query(query, params);
-    return res.json({ families: q.rows });
+
+    return res.json({
+      families: q.rows
+    });
 
   } catch (err) {
     console.error("listFamilies ERROR:", err);
