@@ -1,23 +1,40 @@
-// src/routes/families.js
+
 const express = require("express");
-const router = express.Router();
+const router = express.Router(); 
+const auth = require("../middleware/auth.js");
 
-const auth = require("../middleware/auth"); // or correct path
-const familiesController = require("../controllers/families"); // path to the file you showed
+const familiesController = require("../controllers/familycontroller.js");
+const membersController = require("../controllers/membercontroller.js");
 
-// CREATE FAMILY
-router.post("/", auth, familiesController.createFamily);
+// ===============================
+// Existing routes
+// ===============================
 
-// LIST FAMILIES
-router.get("/", auth, familiesController.listFamilies);
+// GET /families/list (role-based)
+router.get("/list", auth, familiesController.listFamilies);
 
-// SEARCH FAMILIES (important: keep before "/:id" routes)
+// POST /families/create (ASHA only)
+router.post("/create", auth, familiesController.createFamily);
+
+// POST /families/add/members
+router.post("/add/members", auth, membersController.addMember);
+
+// GET members of a family
+router.get("/byFamily/:family_id", auth, membersController.getMembersByFamily);
+
+// PATCH set head of family
+router.patch("/:family_id/set-head/:member_id", auth, familiesController.setHead);
+
+
+// ===============================
+// NEW ROUTES (IMPORTANT)
+// ===============================
+
+// 🔎 Search existing families (ASHA only)
 router.get("/search", auth, familiesController.searchFamilies);
 
-// FULL FAMILY BUNDLE
+// 📦 Download full family bundle
 router.get("/:id/full", auth, familiesController.getFullFamily);
 
-// SET HEAD (example path, adjust if you have different route)
-router.post("/:family_id/head/:member_id", auth, familiesController.setHead);
 
 module.exports = router;
