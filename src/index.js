@@ -25,7 +25,7 @@ app.use("/phcs", require("./routes/phcs"));
 app.use("/health", require("./routes/health"));
 app.use("/tasks", require("./routes/task"));
 app.use("/sync", require("./routes/sync"))
-app.use("/phc", require("./routes/phcAdmin"));
+app.use("/phcAdmin", require("./routes/phcAdmin")); // 👈 yeh sahi
 
 
 
