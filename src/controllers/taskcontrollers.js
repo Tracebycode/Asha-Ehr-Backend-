@@ -1,11 +1,12 @@
 const pool = require("../lib/db");
 
-
+/* ============================================================
+   1. ANM → CREATE NEW TASK FOR ASHA (ONLINE ASSIGNMENT)
+   ============================================================ */
 exports.createTask = async (req, res) => {
   try {
     const user = req.user;
 
-    // 1️⃣ Only ANM can assign tasks
     if (user.role !== "anm") {
       return res.status(403).json({ error: "Only ANM can create tasks" });
     }
@@ -21,16 +22,15 @@ exports.createTask = async (req, res) => {
       data_json
     } = req.body;
 
-    // 2️⃣ Required fields
     if (!asha_worker_id || !task_type || !title) {
       return res.status(400).json({
         error: "asha_worker_id, task_type and title are required"
       });
     }
 
-    // 3️⃣ Check ASHA supervised by this ANM
+    // Check ANM supervises this ASHA
     const checkAsha = await pool.query(
-      `SELECT asha_worker_id 
+      `SELECT 1
        FROM user_supervision_map
        WHERE asha_worker_id = $1 AND anm_worker_id = $2`,
       [asha_worker_id, user.anm_id]
@@ -42,13 +42,13 @@ exports.createTask = async (req, res) => {
       });
     }
 
-    // 4️⃣ Validate family (optional)
     let area_id = null;
 
+    // Validate family
     if (family_id) {
       const fam = await pool.query(
-        `SELECT area_id 
-         FROM families 
+        `SELECT area_id
+         FROM families
          WHERE id = $1 AND asha_worker_id = $2`,
         [family_id, asha_worker_id]
       );
@@ -62,12 +62,12 @@ exports.createTask = async (req, res) => {
       area_id = fam.rows[0].area_id;
     }
 
-    // 5️⃣ Validate member (optional)
+    // Validate member
     if (member_id) {
       const mem = await pool.query(
         `SELECT m.id
          FROM family_members m
-         JOIN families f ON f.id = m.family_id
+         JOIN families f ON m.family_id = f.id
          WHERE m.id = $1 AND f.asha_worker_id = $2`,
         [member_id, asha_worker_id]
       );
@@ -79,7 +79,7 @@ exports.createTask = async (req, res) => {
       }
     }
 
-    // 6️⃣ Insert (FIXED created_by = user.sub)
+    // Insert task
     const insert = await pool.query(
       `INSERT INTO tasks (
         phc_id,
@@ -100,7 +100,7 @@ exports.createTask = async (req, res) => {
       RETURNING *`,
       [
         user.phc_id,
-        user.sub,              // 🔥 REAL FIX
+        user.sub,
         user.anm_id,
         asha_worker_id,
         area_id,
@@ -122,15 +122,14 @@ exports.createTask = async (req, res) => {
 
   } catch (err) {
     console.error("createTask ERROR:", err);
-    return res.status(500).json({
-      error: "Server error",
-      details: err.message
-    });
+    return res.status(500).json({ error: "Server error" });
   }
 };
 
 
-
+/* ============================================================
+   2. LIST TASKS (role-based)
+   ============================================================ */
 exports.listTasks = async (req, res) => {
   try {
     const user = req.user;
@@ -138,7 +137,7 @@ exports.listTasks = async (req, res) => {
     let query = "";
     let params = [];
 
-    // 1️⃣ ASHA — only tasks assigned to her
+    // ASHA → only tasks for her
     if (user.role === "asha") {
       query = `
         SELECT *
@@ -146,10 +145,10 @@ exports.listTasks = async (req, res) => {
         WHERE assigned_to_asha_id = $1
         ORDER BY created_at DESC
       `;
-      params = [user.asha_id];
+      params = [user.asha_worker_id];
     }
 
-    // 2️⃣ ANM — tasks created by her OR tasks assigned to her ASHAs
+    // ANM → tasks she created OR her ASHAs
     else if (user.role === "anm") {
       query = `
         SELECT t.*
@@ -163,7 +162,7 @@ exports.listTasks = async (req, res) => {
       params = [user.anm_id];
     }
 
-    // 3️⃣ PHC Admin / Doctor — all PHC tasks
+    // PHC Admin / Doctor → all PHC tasks
     else if (user.role === "phc_admin" || user.role === "doctor") {
       query = `
         SELECT *
@@ -179,40 +178,31 @@ exports.listTasks = async (req, res) => {
     }
 
     const q = await pool.query(query, params);
-
     return res.json({ tasks: q.rows });
 
   } catch (err) {
     console.error("listTasks ERROR:", err);
-    return res.status(500).json({
-      error: "Server error",
-      details: err.message
-    });
+    return res.status(500).json({ error: "Server error" });
   }
 };
 
 
+/* ============================================================
+   3. UPDATE TASK (ASHA, ANM, PHC)
+   ============================================================ */
 exports.updateTask = async (req, res) => {
   try {
     const user = req.user;
     const { task_id } = req.params;
 
-    const {
-      status,
-      description,
-      due_date,
-      data_json
-    } = req.body;
+    const { status, description, due_date, data_json } = req.body;
 
     if (!task_id) {
       return res.status(400).json({ error: "task_id is required" });
     }
 
-    // 1️⃣ Fetch task
     const t = await pool.query(
-      `SELECT *
-       FROM tasks
-       WHERE id = $1`,
+      `SELECT * FROM tasks WHERE id = $1`,
       [task_id]
     );
 
@@ -221,16 +211,14 @@ exports.updateTask = async (req, res) => {
     }
 
     const task = t.rows[0];
-
-    // 2️⃣ Role-based permission checks
     let allowed = false;
 
-    // ASHA → can update only tasks assigned to her
-    if (user.role === "asha" && task.assigned_to_asha_id === user.asha_id) {
+    // ASHA → only tasks for her
+    if (user.role === "asha" && task.assigned_to_asha_id === user.asha_worker_id) {
       allowed = true;
     }
 
-    // ANM → tasks she created or her ASHA’s tasks
+    // ANM → if created by her OR belongs to her ASHAs
     else if (user.role === "anm") {
       const checkSupervision = await pool.query(
         `SELECT 1 
@@ -244,7 +232,7 @@ exports.updateTask = async (req, res) => {
       }
     }
 
-    // PHC Admin / Doctor → full access
+    // PHC admin / doctor → full access
     else if ((user.role === "phc_admin" || user.role === "doctor") && task.phc_id === user.phc_id) {
       allowed = true;
     }
@@ -253,7 +241,6 @@ exports.updateTask = async (req, res) => {
       return res.status(403).json({ error: "Not authorized to update this task" });
     }
 
-    // 3️⃣ Build dynamic update fields
     const updateFields = [];
     const updateValues = [];
     let index = 1;
@@ -278,13 +265,9 @@ exports.updateTask = async (req, res) => {
       updateValues.push(data_json);
     }
 
-    // Always update updated_at
     updateFields.push(`updated_at = NOW()`);
-
-    // Final value for WHERE
     updateValues.push(task_id);
 
-    // 4️⃣ Execute update
     const q = await pool.query(
       `UPDATE tasks
        SET ${updateFields.join(", ")}
@@ -293,16 +276,116 @@ exports.updateTask = async (req, res) => {
       updateValues
     );
 
-    return res.json({
-      message: "Task updated successfully",
-      task: q.rows[0]
-    });
+    return res.json({ message: "Task updated", task: q.rows[0] });
 
   } catch (err) {
     console.error("updateTask ERROR:", err);
-    return res.status(500).json({
-      error: "Server error",
-      details: err.message
-    });
+    return res.status(500).json({ error: "Server error" });
+  }
+};
+
+
+/* ============================================================
+   4. ASHA OFFLINE SYNC (INSERT/UPDATE USING UPSERT LOGIC)
+   ============================================================ */
+exports.saveTask = async (req, res) => {
+  try {
+    const asha = req.user;
+    const data = req.body;
+
+    // enforce ASHA fields
+    data.assigned_to_asha_id = asha.asha_worker_id;
+    data.phc_id = asha.phc_id;
+
+    const existing = await pool.query(
+      `SELECT * FROM tasks WHERE id = $1`,
+      [data.id]
+    );
+
+    if (existing.rowCount === 0) {
+      const insert = await pool.query(
+        `INSERT INTO tasks (
+          id, phc_id, created_by, assigned_to_asha_id,
+          family_id, member_id, task_type, title, description,
+          due_date, status, device_created_at, device_updated_at, synced_at
+        ) VALUES (
+          $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14
+        )
+        RETURNING *`,
+        [
+          data.id,
+          data.phc_id,
+          asha.sub,
+          data.assigned_to_asha_id,
+          data.family_id,
+          data.member_id,
+          data.task_type,
+          data.title,
+          data.description,
+          data.due_date,
+          data.status || "pending",
+          data.device_created_at,
+          data.device_updated_at,
+          new Date()
+        ]
+      );
+      return res.json(insert.rows[0]);
+    }
+
+    const record = existing.rows[0];
+
+    if (new Date(data.device_updated_at) > record.device_updated_at) {
+      const update = await pool.query(
+        `UPDATE tasks
+         SET family_id=$1, member_id=$2, task_type=$3, title=$4,
+             description=$5, due_date=$6, status=$7, device_updated_at=$8, synced_at=$9
+         WHERE id=$10
+         RETURNING *`,
+        [
+          data.family_id,
+          data.member_id,
+          data.task_type,
+          data.title,
+          data.description,
+          data.due_date,
+          data.status,
+          data.device_updated_at,
+          new Date(),
+          data.id
+        ]
+      );
+
+      return res.json(update.rows[0]);
+    }
+
+    return res.json(record);
+
+  } catch (err) {
+    console.error("saveTask ERROR:", err);
+    return res.status(500).json({ error: "Server error" });
+  }
+};
+
+
+/* ============================================================
+   5. SIMPLE ASHA TASK LIST
+   ============================================================ */
+exports.getMyTasks = async (req, res) => {
+  try {
+    const asha = req.user;
+
+    const q = await pool.query(
+      `SELECT * 
+       FROM tasks
+       WHERE assigned_to_asha_id = $1
+       ORDER BY due_date ASC`,
+      [asha.asha_worker_id]
+    );
+
+    return res.json(q.rows);
+
+  } catch (err) {
+    console.error("getMyTasks ERROR:", err);
+    return res.status(500).json({ error: "Server error" });
   }
 };
