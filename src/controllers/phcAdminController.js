@@ -232,90 +232,23 @@ exports.getHealthCases = async (req, res) => {
   try {
     const phcId = req.user.phc_id;
 
-    const {
-      q,           // search patient name
-      anm_id,
-      asha_id,
-      area_id,
-      risk_level,
-      status,
-      category,    // "ANC" | "PNC" | etc.
-    } = req.query;
-
-    const where = ["hr.phc_id = $1"];
-    const values = [phcId];
-    let idx = 2;
-
-    // category → visit_type (ANC page)
-    if (category) {
-      // makes "ANC", "anc", "Anc" all work
-      where.push(`LOWER(hr.visit_type) = LOWER($${idx})`);
-      values.push(category);
-      idx++;
-    }
-
-    if (anm_id) {
-      where.push(`hr.anm_worker_id = $${idx}`);
-      values.push(anm_id);
-      idx++;
-    }
-
-    if (asha_id) {
-      where.push(`hr.asha_worker_id = $${idx}`);
-      values.push(asha_id);
-      idx++;
-    }
-
-    // 🔹 use health_records.area_id (you have this column)
-    if (area_id) {
-      where.push(`hr.area_id = $${idx}`);
-      values.push(area_id);
-      idx++;
-    }
-
-    if (status) {
-      where.push(`hr.status = $${idx}`);
-      values.push(status);
-      idx++;
-    }
-
-    if (risk_level) {
-      // change "risk_level" here if your JSON key is different
-      where.push(`hr.data_json->>'risk_level' = $${idx}`);
-      values.push(risk_level);
-      idx++;
-    }
-
-    if (q) {
-      where.push(`fm.name ILIKE $${idx}`);
-      values.push(`%${q}%`);
-      idx++;
-    }
-
     const query = `
       SELECT 
         hr.id AS id,
         hr.status,
         hr.visit_type,
-
-        -- patient fields your UI uses
         fm.name AS patient_name,
         fm.age,
         fm.gender,
-
-        -- risk from JSON
         hr.data_json->>'risk_level' AS risk_level
-
       FROM health_records hr
       JOIN family_members fm ON fm.id = hr.member_id
-      LEFT JOIN families f ON f.id = fm.family_id
-      LEFT JOIN phc_areas pa ON pa.id = hr.area_id
-
-      WHERE ${where.join(" AND ")}
+      WHERE hr.phc_id = $1
       ORDER BY hr.created_at DESC;
     `;
 
-    const { rows } = await pool.query(query, values);
+    const { rows } = await pool.query(query, [phcId]);
+    console.log("getHealthCases rows count:", rows.length);
     return res.json(rows);
   } catch (error) {
     console.error("getHealthCases error:", error);
