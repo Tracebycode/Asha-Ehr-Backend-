@@ -3,9 +3,11 @@ require("dotenv").config();
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
+  max: 3,  // limit connections (important)
   ssl: {
-    rejectUnauthorized: false,   // Supabase ke liye required
-  },
+    require: true,          // force SSL
+    rejectUnauthorized: false
+  }
 });
 
 module.exports = pool;
