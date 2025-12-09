@@ -293,63 +293,117 @@ exports.saveTask = async (req, res) => {
     const asha = req.user;
     const data = req.body;
 
-    // enforce ASHA fields
+    // Fill backend-controlled fields
     data.assigned_to_asha_id = asha.asha_worker_id;
     data.phc_id = asha.phc_id;
 
+    // Always enforce area from ASHA
+    data.area_id = asha.area?.id;
+
+    if (!data.area_id) {
+      return res.status(400).json({ error: "ASHA area_id missing" });
+    }
+
+    // Check if task exists (upsert)
     const existing = await pool.query(
       `SELECT * FROM tasks WHERE id = $1`,
       [data.id]
     );
 
+    // ============================
+    // INSERT NEW TASK
+    // ============================
     if (existing.rowCount === 0) {
+
       const insert = await pool.query(
         `INSERT INTO tasks (
-          id, phc_id, created_by, assigned_to_asha_id,
-          family_id, member_id, task_type, title, description,
-          due_date, status, device_created_at, device_updated_at, synced_at
+          id,
+          phc_id,
+          created_by,
+          assigned_by_anm_id,
+          assigned_to_asha_id,
+          area_id,
+          family_id,
+          member_id,
+          parent_task_id,
+          task_type,
+          title,
+          description,
+          due_date,
+          status,
+          data_json,
+          device_created_at,
+          device_updated_at,
+          synced_at,
+          created_at,
+          updated_at
         ) VALUES (
-          $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14
+          $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20
         )
         RETURNING *`,
         [
           data.id,
           data.phc_id,
-          asha.sub,
+          asha.sub,                      // created_by = ASHA user_id
+          null,                          // assigned_by_anm_id (ANM not involved here)
           data.assigned_to_asha_id,
+          data.area_id,
           data.family_id,
           data.member_id,
+          data.parent_task_id || null,
           data.task_type,
           data.title,
           data.description,
           data.due_date,
           data.status || "pending",
+          data.data_json || null,
           data.device_created_at,
           data.device_updated_at,
-          new Date()
+          new Date(),                    // synced_at
+          new Date(),                    // created_at
+          new Date()                     // updated_at
         ]
       );
+
       return res.json(insert.rows[0]);
     }
 
+    // ============================
+    // UPDATE IF NEWER
+    // ============================
     const record = existing.rows[0];
 
     if (new Date(data.device_updated_at) > record.device_updated_at) {
+
       const update = await pool.query(
         `UPDATE tasks
-         SET family_id=$1, member_id=$2, task_type=$3, title=$4,
-             description=$5, due_date=$6, status=$7, device_updated_at=$8, synced_at=$9
-         WHERE id=$10
+         SET 
+            family_id=$1,
+            member_id=$2,
+            parent_task_id=$3,
+            task_type=$4,
+            title=$5,
+            description=$6,
+            due_date=$7,
+            status=$8,
+            data_json=$9,
+            device_updated_at=$10,
+            synced_at=$11,
+            updated_at=$12
+         WHERE id=$13
          RETURNING *`,
         [
           data.family_id,
           data.member_id,
+          data.parent_task_id || null,
           data.task_type,
           data.title,
           data.description,
           data.due_date,
           data.status,
+          data.data_json || null,
           data.device_updated_at,
+          new Date(),
           new Date(),
           data.id
         ]
@@ -358,6 +412,7 @@ exports.saveTask = async (req, res) => {
       return res.json(update.rows[0]);
     }
 
+    // No update needed
     return res.json(record);
 
   } catch (err) {
@@ -365,6 +420,7 @@ exports.saveTask = async (req, res) => {
     return res.status(500).json({ error: "Server error" });
   }
 };
+
 
 
 /* ============================================================
