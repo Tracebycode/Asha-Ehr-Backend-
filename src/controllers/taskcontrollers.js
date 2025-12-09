@@ -33,7 +33,7 @@ exports.createTask = async (req, res) => {
       `SELECT 1
        FROM user_supervision_map
        WHERE asha_worker_id = $1 AND anm_worker_id = $2`,
-      [asha_worker_id, user.anm_id]
+      [asha_worker_id, user.anm_worker_id]
     );
 
     if (checkAsha.rowCount === 0) {
@@ -101,7 +101,7 @@ exports.createTask = async (req, res) => {
       [
         user.phc_id,
         user.sub,
-        user.anm_id,
+        user.anm_worker_id,
         asha_worker_id,
         area_id,
         family_id || null,
@@ -159,7 +159,7 @@ exports.listTasks = async (req, res) => {
            OR m.anm_worker_id = $1
         ORDER BY t.created_at DESC
       `;
-      params = [user.anm_id];
+      params = [user.anm_worker_id];
     }
 
     // PHC Admin / Doctor → all PHC tasks
@@ -224,10 +224,10 @@ exports.updateTask = async (req, res) => {
         `SELECT 1 
          FROM user_supervision_map
          WHERE asha_worker_id = $1 AND anm_worker_id = $2`,
-        [task.assigned_to_asha_id, user.anm_id]
+        [task.assigned_to_asha_id, user.anm_worker_id]
       );
 
-      if (task.assigned_by_anm_id === user.anm_id || checkSupervision.rowCount > 0) {
+      if (task.assigned_by_anm_id === user.anm_worker_id || checkSupervision.rowCount > 0) {
         allowed = true;
       }
     }
