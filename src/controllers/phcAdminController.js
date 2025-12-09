@@ -259,25 +259,24 @@ exports.getHealthCases = async (req, res) => {
   try {
     const phcId = req.user.phc_id;
 
-    // filters coming from /api/phc/cases
+    // filters coming from /phcAdmin/cases
     const {
-      category,    // e.g. "ANC"
+      category,    // "ANC"
       anm_id,
       asha_id,
       area_id,
       risk_level,
       date_from,
       date_to,
-      q,           // search text
+      q,
     } = req.query;
 
-    // dynamic WHERE clause
     const where = ["hr.phc_id = $1"];
     const params = [phcId];
 
     if (category) {
       params.push(category);
-      where.push(`hr.visit_type = $${params.length}`);      // adjust if you store ANC differently
+      where.push(`hr.visit_type = $${params.length}`);
     }
 
     if (risk_level) {
@@ -324,8 +323,8 @@ exports.getHealthCases = async (req, res) => {
         hr.visit_type,
         hr.created_at,
 
-        -- 🔹 FULL ANC FORM DATA (JSON)
-        hr.data_json,
+        -- 🔹 full ANC payload
+        hr.data_json AS data_json,
 
         -- member / patient
         fm.id        AS member_id,
@@ -333,7 +332,7 @@ exports.getHealthCases = async (req, res) => {
         fm.age,
         fm.gender,
 
-        -- risk (from JSON)
+        -- risk from JSON (also accessible as data_json.risk_level)
         hr.data_json->>'risk_level' AS risk_level,
 
         -- family + area
@@ -355,10 +354,10 @@ exports.getHealthCases = async (req, res) => {
       FROM health_records hr
       JOIN family_members fm ON fm.id = hr.member_id
       JOIN families       f  ON f.id  = fm.family_id
-      LEFT JOIN phc_areas     pa    ON pa.id   = f.area_id
-      LEFT JOIN asha_workers  aw    ON aw.id   = f.asha_worker_id
+      LEFT JOIN phc_areas     pa    ON pa.id    = f.area_id
+      LEFT JOIN asha_workers  aw    ON aw.id    = f.asha_worker_id
       LEFT JOIN users         u_asha ON u_asha.id = aw.user_id
-      LEFT JOIN anm_workers   anm   ON anm.id  = f.anm_worker_id
+      LEFT JOIN anm_workers   anm   ON anm.id   = f.anm_worker_id
       LEFT JOIN users         u_anm ON u_anm.id = anm.user_id
       WHERE ${where.join(" AND ")}
       ORDER BY hr.created_at DESC;
@@ -371,3 +370,4 @@ exports.getHealthCases = async (req, res) => {
     return res.status(500).json({ error: "Server error" });
   }
 };
+
