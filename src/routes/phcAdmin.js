@@ -27,14 +27,7 @@ router.get("/anms", auth, phcOnly, phcAdminController.getAllAnmWorkers);
 // ANM FULL DETAILS
 router.get("/anms/:anmId", auth, phcOnly, phcAdminController.getAnmDetails);
 
-router.get(
-  "/cases",
-  auth,
-  phcAdminController.getHealthCases
-);
-
-//health case
-router.get("/cases", auth, phcAdminController.getHealthCases);
+router.get("/cases", auth, phcOnly, phcAdminController.getHealthCases);
 
 
 
