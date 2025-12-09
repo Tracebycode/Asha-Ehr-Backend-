@@ -245,8 +245,8 @@ exports.getHealthCases = async (req, res) => {
 
     // category → visit_type (ANC page)
     if (category) {
-      where.push(`hr.visit_type = $${idx}`);
-      values.push(category.toLowerCase()); // or "ANC" if your DB stores caps
+      where.push(`LOWER(hr.visit_type) = LOWER($${idx})`);
+      values.push(category); // "ANC" from frontend will match "anc" / "ANC"
       idx++;
     }
 
