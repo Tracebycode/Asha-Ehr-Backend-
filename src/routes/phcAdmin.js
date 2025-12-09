@@ -33,6 +33,8 @@ router.get(
   phcAdminController.getHealthCases
 );
 
+//health case
+router.get("/cases", auth, phcAdminController.getHealthCases);
 
 
 
