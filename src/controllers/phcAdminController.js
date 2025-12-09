@@ -233,37 +233,28 @@ exports.getAshaSummary = async (req, res) => {
 
     const phcId = req.user.phc_id;
 
-    // 1) total
-    const totalResult = await pool.query(
-      `
-      SELECT COUNT(*)::int AS total_ashas
+    // Get status of all ASHAs under this PHC.
+    // This uses the SAME join as getAllAshaWorkers and is very safe.
+    const statusQuery = `
+      SELECT u.status
       FROM asha_workers aw
       JOIN users u ON u.id = aw.user_id
       WHERE u.phc_id = $1
-      `,
-      [phcId]
-    );
-    const total_ashas = totalResult.rows[0]?.total_ashas || 0;
+    `;
 
-    // 2) active
-    const activeResult = await pool.query(
-      `
-      SELECT COUNT(*)::int AS active_ashas
-      FROM asha_workers aw
-      JOIN users u ON u.id = aw.user_id
-      WHERE u.phc_id = $1
-        AND u.status = 'active'
-      `,
-      [phcId]
-    );
-    const active_ashas = activeResult.rows[0]?.active_ashas || 0;
+    const { rows } = await pool.query(statusQuery, [phcId]);
 
-    // 3) disabled = total - active (or you can run another query)
+    const total_ashas = rows.length;
+    const active_ashas = rows.filter((r) => r.status === "active").length;
     const disabled_ashas = total_ashas - active_ashas;
 
     return res.json({ total_ashas, active_ashas, disabled_ashas });
   } catch (error) {
     console.error("getAshaSummary ERROR:", error);
-    return res.status(500).json({ error: "Server error" });
+    // send details for debugging while we test
+    return res.status(500).json({
+      error: "Server error",
+      details: error.message,
+    });
   }
 };
