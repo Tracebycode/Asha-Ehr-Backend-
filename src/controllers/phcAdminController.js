@@ -227,8 +227,6 @@ exports.getAnmDetails = async (req, res) => {
 // 7. GENERIC HEALTH CASE LIST FOR PHC
 // ===================================
 exports.getHealthCases = async (req, res) => {
-  if (!assertPhcUser(req, res)) return;
-
   try {
     const phcId = req.user.phc_id;
 
@@ -248,7 +246,6 @@ exports.getHealthCases = async (req, res) => {
     `;
 
     const { rows } = await pool.query(query, [phcId]);
-    console.log("getHealthCases rows count:", rows.length);
     return res.json(rows);
   } catch (error) {
     console.error("getHealthCases error:", error);
