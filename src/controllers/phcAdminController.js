@@ -274,10 +274,10 @@ exports.getHealthCases = async (req, res) => {
     const where = ["hr.phc_id = $1"];
     const params = [phcId];
 
-    if (category) {
-      params.push(category);
-      where.push(`hr.visit_type = $${params.length}`);
-    }
+   if (category) {
+  params.push(`%${category}%`);
+  where.push(`LOWER(hr.visit_type) LIKE LOWER($${params.length})`);
+}
 
     if (risk_level) {
       params.push(risk_level);
