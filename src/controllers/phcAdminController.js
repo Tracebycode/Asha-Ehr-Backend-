@@ -224,33 +224,46 @@ exports.getAnmDetails = async (req, res) => {
 // =======================
 exports.getAshaSummary = async (req, res) => {
   try {
-    // PHC admin only – you already checked role in auth or can reuse ensurePhcAdmin
+    // PHC admin only
     if (!req.user || req.user.role !== "phc_admin") {
-      return res.status(403).json({ error: "Access denied: PHC admin only" });
+      return res
+        .status(403)
+        .json({ error: "Access denied: PHC admin only" });
     }
 
     const phcId = req.user.phc_id;
 
-    const query = `
-      SELECT
-        COUNT(*)::int AS total_ashas,
-        COUNT(*) FILTER (WHERE u.status = 'active')::int AS active_ashas,
-        COUNT(*) FILTER (WHERE u.status <> 'active')::int AS disabled_ashas
+    // 1) total
+    const totalResult = await pool.query(
+      `
+      SELECT COUNT(*)::int AS total_ashas
       FROM asha_workers aw
       JOIN users u ON u.id = aw.user_id
-      WHERE u.phc_id = $1;
-    `;
+      WHERE u.phc_id = $1
+      `,
+      [phcId]
+    );
+    const total_ashas = totalResult.rows[0]?.total_ashas || 0;
 
-    const { rows } = await pool.query(query, [phcId]);
-    const stats = rows[0] || {
-      total_ashas: 0,
-      active_ashas: 0,
-      disabled_ashas: 0,
-    };
+    // 2) active
+    const activeResult = await pool.query(
+      `
+      SELECT COUNT(*)::int AS active_ashas
+      FROM asha_workers aw
+      JOIN users u ON u.id = aw.user_id
+      WHERE u.phc_id = $1
+        AND u.status = 'active'
+      `,
+      [phcId]
+    );
+    const active_ashas = activeResult.rows[0]?.active_ashas || 0;
 
-    return res.json(stats);
+    // 3) disabled = total - active (or you can run another query)
+    const disabled_ashas = total_ashas - active_ashas;
+
+    return res.json({ total_ashas, active_ashas, disabled_ashas });
   } catch (error) {
     console.error("getAshaSummary ERROR:", error);
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 };
