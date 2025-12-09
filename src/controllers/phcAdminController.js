@@ -219,3 +219,105 @@ exports.getAnmDetails = async (req, res) => {
   }
 
 };
+
+
+//health case
+
+exports.getHealthCases = async (req, res) => {
+  if (!assertPhcUser(req, res)) return;
+
+  try {
+    const phcId = req.user.phc_id;
+
+    const {
+      q,           // search patient name
+      anm_id,
+      asha_id,
+      area_id,
+      risk_level,
+      status,
+      category,    // "ANC" | "PNC" | etc.
+    } = req.query;
+
+    const where = ["hr.phc_id = $1"];
+    const values = [phcId];
+    let idx = 2;
+
+    // category → visit_type (ANC page)
+    if (category) {
+      where.push(`hr.visit_type = $${idx}`);
+      values.push(category.toLowerCase()); // or "ANC" if your DB stores caps
+      idx++;
+    }
+
+    if (anm_id) {
+      where.push(`hr.anm_worker_id = $${idx}`);
+      values.push(anm_id);
+      idx++;
+    }
+
+    if (asha_id) {
+      where.push(`hr.asha_worker_id = $${idx}`);
+      values.push(asha_id);
+      idx++;
+    }
+
+    if (area_id) {
+      where.push(`f.area_id = $${idx}`);
+      values.push(area_id);
+      idx++;
+    }
+
+    if (status) {
+      where.push(`hr.status = $${idx}`);
+      values.push(status);
+      idx++;
+    }
+
+    if (risk_level) {
+      // assuming stored in data_json->>'risk_level'
+      where.push(`hr.data_json->>'risk_level' = $${idx}`);
+      values.push(risk_level);
+      idx++;
+    }
+
+    if (q) {
+      where.push(`fm.name ILIKE $${idx}`);
+      values.push(`%${q}%`);
+      idx++;
+    }
+
+    const query = `
+      SELECT 
+        hr.id AS id,
+        hr.status,
+        hr.visit_type,
+
+        -- patient fields your UI uses
+        fm.name AS patient_name,
+        fm.age,
+        fm.gender,
+
+        -- risk from JSON
+        hr.data_json->>'risk_level' AS risk_level
+
+        -- (you can add more fields here if you want)
+      FROM health_records hr
+      JOIN family_members fm ON fm.id = hr.member_id
+      JOIN families f ON f.id = fm.family_id
+      LEFT JOIN phc_areas pa ON pa.id = f.area_id
+      LEFT JOIN asha_workers aw ON aw.id = hr.asha_worker_id
+      LEFT JOIN users asha_user ON asha_user.id = aw.user_id
+      LEFT JOIN anm_workers anm ON anm.id = hr.anm_worker_id
+      LEFT JOIN users anm_user ON anm_user.id = anm.user_id
+      WHERE ${where.join(" AND ")}
+      ORDER BY hr.created_at DESC;
+    `;
+
+    const { rows } = await pool.query(query, values);
+    res.json(rows);
+  } catch (error) {
+    console.error("getHealthCases error:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+};
