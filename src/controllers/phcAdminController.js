@@ -223,6 +223,9 @@ exports.getAnmDetails = async (req, res) => {
 
 //health case
 
+// ===================================
+// 7. GENERIC HEALTH CASE LIST FOR PHC
+// ===================================
 exports.getHealthCases = async (req, res) => {
   if (!assertPhcUser(req, res)) return;
 
@@ -245,8 +248,9 @@ exports.getHealthCases = async (req, res) => {
 
     // category → visit_type (ANC page)
     if (category) {
+      // makes "ANC", "anc", "Anc" all work
       where.push(`LOWER(hr.visit_type) = LOWER($${idx})`);
-      values.push(category); // "ANC" from frontend will match "anc" / "ANC"
+      values.push(category);
       idx++;
     }
 
@@ -262,8 +266,9 @@ exports.getHealthCases = async (req, res) => {
       idx++;
     }
 
+    // 🔹 use health_records.area_id (you have this column)
     if (area_id) {
-      where.push(`f.area_id = $${idx}`);
+      where.push(`hr.area_id = $${idx}`);
       values.push(area_id);
       idx++;
     }
@@ -275,7 +280,7 @@ exports.getHealthCases = async (req, res) => {
     }
 
     if (risk_level) {
-      // assuming stored in data_json->>'risk_level'
+      // change "risk_level" here if your JSON key is different
       where.push(`hr.data_json->>'risk_level' = $${idx}`);
       values.push(risk_level);
       idx++;
@@ -301,23 +306,19 @@ exports.getHealthCases = async (req, res) => {
         -- risk from JSON
         hr.data_json->>'risk_level' AS risk_level
 
-        -- (you can add more fields here if you want)
       FROM health_records hr
       JOIN family_members fm ON fm.id = hr.member_id
-      JOIN families f ON f.id = fm.family_id
-      LEFT JOIN phc_areas pa ON pa.id = f.area_id
-      LEFT JOIN asha_workers aw ON aw.id = hr.asha_worker_id
-      LEFT JOIN users asha_user ON asha_user.id = aw.user_id
-      LEFT JOIN anm_workers anm ON anm.id = hr.anm_worker_id
-      LEFT JOIN users anm_user ON anm_user.id = anm.user_id
+      LEFT JOIN families f ON f.id = fm.family_id
+      LEFT JOIN phc_areas pa ON pa.id = hr.area_id
+
       WHERE ${where.join(" AND ")}
       ORDER BY hr.created_at DESC;
     `;
 
     const { rows } = await pool.query(query, values);
-    res.json(rows);
+    return res.json(rows);
   } catch (error) {
     console.error("getHealthCases error:", error);
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 };
