@@ -278,7 +278,6 @@ exports.getHealthCases = async (req, res) => {
     if (category) {
       params.push(category);
       where.push(`hr.visit_type = $${params.length}`);      // adjust if you store ANC differently
-      // or use ILIKE if needed: hr.visit_type ILIKE $${params.length}
     }
 
     if (risk_level) {
@@ -325,6 +324,9 @@ exports.getHealthCases = async (req, res) => {
         hr.visit_type,
         hr.created_at,
 
+        -- 🔹 FULL ANC FORM DATA (JSON)
+        hr.data_json,
+
         -- member / patient
         fm.id        AS member_id,
         fm.name      AS patient_name,
@@ -353,10 +355,10 @@ exports.getHealthCases = async (req, res) => {
       FROM health_records hr
       JOIN family_members fm ON fm.id = hr.member_id
       JOIN families       f  ON f.id  = fm.family_id
-      LEFT JOIN phc_areas     pa   ON pa.id   = f.area_id
-      LEFT JOIN asha_workers  aw   ON aw.id   = f.asha_worker_id
+      LEFT JOIN phc_areas     pa    ON pa.id   = f.area_id
+      LEFT JOIN asha_workers  aw    ON aw.id   = f.asha_worker_id
       LEFT JOIN users         u_asha ON u_asha.id = aw.user_id
-      LEFT JOIN anm_workers   anm  ON anm.id  = f.anm_worker_id
+      LEFT JOIN anm_workers   anm   ON anm.id  = f.anm_worker_id
       LEFT JOIN users         u_anm ON u_anm.id = anm.user_id
       WHERE ${where.join(" AND ")}
       ORDER BY hr.created_at DESC;
