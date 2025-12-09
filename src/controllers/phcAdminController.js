@@ -9,24 +9,55 @@ exports.getAllAshaWorkers = async (req, res) => {
 
     const query = `
       SELECT 
-        aw.id AS asha_id,
-        u.name,
-        u.phone,
-        u.status,
-        usm.anm_worker_id,
-        (
-          SELECT json_agg(pa.area_name)
-          FROM user_area_map uam 
-          JOIN phc_areas pa ON pa.id = uam.area_id
-          WHERE uam.user_id = u.id
-        ) AS areas,
-        (SELECT COUNT(*) FROM families f WHERE f.asha_worker_id = aw.id) AS total_families,
-        (SELECT COUNT(*) FROM tasks t WHERE t.assigned_to_asha_id = aw.id) AS total_tasks
-      FROM asha_workers aw
-      JOIN users u ON u.id = aw.user_id
-      LEFT JOIN user_supervision_map usm ON usm.asha_worker_id = aw.id
-      WHERE u.phc_id = $1
-      ORDER BY u.name ASC;
+        hr.id AS id,
+        hr.status,
+        hr.visit_type,
+        fm.name   AS patient_name,
+        fm.age,
+        fm.gender,
+
+        -- whole form payload
+        hr.data_json,
+
+        -- convenience fields
+        hr.data_json->>'risk_level'           AS risk_level,
+        hr.data_json->>'gravida'              AS gravida,
+        hr.data_json->>'para'                 AS para,
+        hr.data_json->>'living'               AS living,
+        hr.data_json->>'abortions'            AS abortions,
+        hr.data_json->>'lmpDate'              AS lmp_date,
+        hr.data_json->>'eddDate'              AS edd_date,
+        hr.data_json->>'bp'                   AS bp,
+        hr.data_json->>'weight'               AS weight,
+        hr.data_json->>'hemoglobin'           AS hemoglobin,
+        hr.data_json->>'bloodSugar'           AS blood_sugar,
+        hr.data_json->>'ifaTablets'           AS ifa_tablets,
+        hr.data_json->>'calciumTablets'       AS calcium_tablets,
+        hr.data_json->>'selectedVaccineDose'  AS selected_vaccine_dose,
+        hr.data_json->>'vaccinationDate'      AS vaccination_date,
+        hr.data_json->>'symptoms'             AS symptoms,
+        hr.data_json->>'otherSymptoms'        AS other_symptoms,
+        hr.data_json->>'previousCesarean'     AS previous_cesarean,
+        hr.data_json->>'previousStillbirth'   AS previous_stillbirth,
+        hr.data_json->>'previousComplications' AS previous_complications,
+
+        -- family / area / worker info
+        f.id          AS family_id,
+        f.address_line,
+        pa.area_name,
+        asha_u.name   AS asha_name,
+        anm_u.name    AS anm_name
+
+      FROM health_records hr
+      JOIN family_members fm ON fm.id = hr.member_id
+      JOIN families f        ON f.id = fm.family_id
+      LEFT JOIN phc_areas pa ON pa.id = f.area_id
+      LEFT JOIN asha_workers aw ON aw.id = f.asha_worker_id
+      LEFT JOIN users asha_u    ON asha_u.id = aw.user_id
+      LEFT JOIN anm_workers anm ON anm.id = f.anm_worker_id
+      LEFT JOIN users anm_u     ON anm_u.id = anm.user_id
+      WHERE hr.phc_id = $1
+      ORDER BY hr.created_at DESC;
     `;
 
     const { rows } = await pool.query(query, [phcId]);
