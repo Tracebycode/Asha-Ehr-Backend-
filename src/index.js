@@ -1,5 +1,7 @@
 const express = require("express");
 const cors = require("cors");
+const app = express(); // <-- TERA MISSING PART
+
 
 const authController = require("./controllers/authcontrollers.js");
 const userController = require("./controllers/usercontrollers.js");
