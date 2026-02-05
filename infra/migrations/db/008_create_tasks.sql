@@ -1,76 +1,172 @@
-create table public.tasks (
-  id uuid not null default gen_random_uuid(),
+-- =========================================
+-- Tasks Table
+-- Workforce workflow + visit scheduling
+-- Offline-first distributed work orchestration
+-- =========================================
 
-  phc_id uuid not null,
-  area_id uuid not null,
+CREATE TABLE public.tasks (
 
-  created_by uuid not null,
-  assigned_to uuid null,
+    -- Primary Identifier
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
-  family_id uuid null,
-  member_id uuid null,
+    -- Administrative Ownership
+    phc_id UUID NOT NULL,
+    area_id UUID NOT NULL,
 
-  parent_task_id uuid null,
+    -- Task Ownership
+    created_by UUID,
+    assigned_to UUID,
 
-  task_type text not null,
-  title text not null,
-  description text null,
+    -- Optional Context Linking
+    family_id UUID,
+    member_id UUID,
 
-  due_date date null,
+    -- Task Hierarchy
+    parent_task_id UUID,
 
-  status text not null default 'PENDING',
+    -- Task Metadata
+    task_type TEXT NOT NULL,
+    title TEXT NOT NULL,
+    description TEXT,
 
-  data_json jsonb null,
+    due_date DATE,
 
-  -- offline-first metadata
-  device_created_at timestamp without time zone default now(),
-  device_updated_at timestamp without time zone default now(),
-  synced_at timestamp without time zone null,
+    -- Workflow Lifecycle
+    workflow_status TEXT DEFAULT 'draft',
 
-  created_at timestamp without time zone default now(),
-  updated_at timestamp without time zone default now(),
+    -- Flexible Task Payload
+    data_json JSONB,
 
-  constraint tasks_pkey primary key (id),
+    -- =========================================
+    -- OCC Concurrency Metadata
+    -- =========================================
 
-  constraint tasks_phc_id_fkey
-    foreign key (phc_id) references phcs (id) on delete restrict,
+    version INTEGER NOT NULL DEFAULT 1,
 
-  constraint tasks_area_id_fkey
-    foreign key (area_id) references phc_areas (id) on delete restrict,
+    last_modified_by UUID,
+    last_modified_role TEXT,
+    last_modified_device TEXT,
 
-  constraint tasks_created_by_fkey
-    foreign key (created_by) references users (id) on delete set null,
+    -- =========================================
+    -- Offline Sync Metadata
+    -- =========================================
 
-  constraint tasks_assigned_to_fkey
-    foreign key (assigned_to) references users (id) on delete set null,
+    device_id TEXT,
+    device_created_at TIMESTAMPTZ DEFAULT now(),
+    device_updated_at TIMESTAMPTZ DEFAULT now(),
+    synced_at TIMESTAMPTZ,
 
-  constraint tasks_family_id_fkey
-    foreign key (family_id) references families (id) on delete set null,
+    -- =========================================
+    -- Soft Delete
+    -- =========================================
 
-  constraint tasks_member_id_fkey
-    foreign key (member_id) references family_members (id) on delete set null,
+    is_active BOOLEAN DEFAULT TRUE,
 
-  constraint tasks_parent_task_id_fkey
-    foreign key (parent_task_id) references tasks (id) on delete set null,
+    -- =========================================
+    -- Audit Metadata
+    -- =========================================
 
-  constraint tasks_status_check
-    check (status in ('PENDING', 'IN_PROGRESS', 'COMPLETED', 'VERIFIED')),
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now(),
 
-  constraint tasks_task_type_check
-    check (
-      task_type in (
-        'ANC',
-        'PNC',
-        'TB_SCREEN',
-        'IMMUNIZATION',
-        'GENERAL',
-        'SURVEY',
-        'CUSTOM'
-      )
-    )
+    -- =========================================
+    -- Constraints
+    -- =========================================
+
+    CONSTRAINT tasks_phc_id_fkey
+        FOREIGN KEY (phc_id)
+        REFERENCES public.phcs(id),
+
+    CONSTRAINT tasks_area_id_fkey
+        FOREIGN KEY (area_id)
+        REFERENCES public.phc_areas(id),
+
+    CONSTRAINT tasks_created_by_fkey
+        FOREIGN KEY (created_by)
+        REFERENCES public.users(id)
+        ON DELETE SET NULL,
+
+    CONSTRAINT tasks_assigned_to_fkey
+        FOREIGN KEY (assigned_to)
+        REFERENCES public.users(id)
+        ON DELETE SET NULL,
+
+    CONSTRAINT tasks_family_id_fkey
+        FOREIGN KEY (family_id)
+        REFERENCES public.families(id)
+        ON DELETE SET NULL,
+
+    CONSTRAINT tasks_member_id_fkey
+        FOREIGN KEY (member_id)
+        REFERENCES public.family_members(id)
+        ON DELETE SET NULL,
+
+    CONSTRAINT tasks_parent_task_id_fkey
+        FOREIGN KEY (parent_task_id)
+        REFERENCES public.tasks(id)
+        ON DELETE SET NULL,
+
+    CONSTRAINT tasks_workflow_check
+        CHECK (
+            workflow_status IN (
+                'draft',
+                'assigned',
+                'in_progress',
+                'completed',
+                'verified',
+                'cancelled'
+            )
+        ),
+
+    CONSTRAINT tasks_type_check
+        CHECK (
+            task_type IN (
+                'ANC',
+                'PNC',
+                'TB_SCREEN',
+                'IMMUNIZATION',
+                'GENERAL',
+                'SURVEY',
+                'CUSTOM'
+            )
+        )
 );
 
-create trigger trg_tasks_updated
-before update on tasks
-for each row
-execute function update_timestamp();
+-- =========================================
+-- JSONB Index
+-- =========================================
+
+CREATE INDEX idx_tasks_data
+ON public.tasks
+USING GIN (data_json);
+
+-- =========================================
+-- Performance Indexes
+-- =========================================
+
+CREATE INDEX idx_tasks_area
+ON public.tasks(area_id);
+
+CREATE INDEX idx_tasks_assigned
+ON public.tasks(assigned_to);
+
+CREATE INDEX idx_tasks_family
+ON public.tasks(family_id);
+
+CREATE INDEX idx_tasks_member
+ON public.tasks(member_id);
+
+CREATE INDEX idx_tasks_active
+ON public.tasks(is_active);
+
+CREATE INDEX idx_tasks_version
+ON public.tasks(version);
+
+-- =========================================
+-- Trigger for Auto updated_at
+-- =========================================
+
+CREATE TRIGGER trg_tasks_updated
+BEFORE UPDATE ON public.tasks
+FOR EACH ROW
+EXECUTE FUNCTION update_timestamp();

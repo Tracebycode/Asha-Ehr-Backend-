@@ -1,36 +1,103 @@
-create table public.families (
-  id uuid not null default gen_random_uuid(),
+-- =========================================
+-- Families Table
+-- Household identity + eligibility anchor
+-- First table with full offline concurrency support
+-- =========================================
 
-  phc_id uuid not null,
-  area_id uuid not null,
-  asha_id uuid not null,
+CREATE TABLE public.families (
 
-  head_member_id uuid null,
+    -- Primary Identifier
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
-  address_line text null,
-  landmark text null,
+    -- Administrative Ownership
+    phc_id UUID NOT NULL,
+    area_id UUID NOT NULL,
+    asha_id UUID NOT NULL,
 
-  -- offline-first metadata
-  device_created_at timestamp without time zone default now(),
-  device_updated_at timestamp without time zone default now(),
-  synced_at timestamp without time zone null,
+    -- Household Metadata
+    head_member_id UUID,
 
-  created_at timestamp without time zone default now(),
-  updated_at timestamp without time zone default now(),
+    address_line TEXT,
+    landmark TEXT,
 
-  constraint families_pkey primary key (id),
+    -- =========================================
+    -- Offline Concurrency Metadata
+    -- =========================================
 
-  constraint families_phc_id_fkey
-    foreign key (phc_id) references phcs (id) on delete restrict,
+    version INTEGER NOT NULL DEFAULT 1,
 
-  constraint families_area_id_fkey
-    foreign key (area_id) references phc_areas (id) on delete restrict,
+    last_modified_by UUID,
+    last_modified_role TEXT,
+    last_modified_device TEXT,
 
-  constraint families_asha_id_fkey
-    foreign key (asha_id) references users (id) on delete restrict
+    -- =========================================
+    -- Workflow / Verification Lifecycle
+    -- =========================================
+
+    workflow_status TEXT DEFAULT 'draft',
+
+    -- =========================================
+    -- Offline Sync Metadata
+    -- =========================================
+
+    device_created_at TIMESTAMPTZ DEFAULT now(),
+    device_updated_at TIMESTAMPTZ DEFAULT now(),
+    synced_at TIMESTAMPTZ,
+
+    -- =========================================
+    -- Soft Delete
+    -- =========================================
+
+    is_active BOOLEAN DEFAULT TRUE,
+
+    -- =========================================
+    -- Audit Metadata
+    -- =========================================
+
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now(),
+
+    -- =========================================
+    -- Constraints
+    -- =========================================
+
+    CONSTRAINT families_phc_id_fkey
+        FOREIGN KEY (phc_id)
+        REFERENCES public.phcs(id),
+
+    CONSTRAINT families_area_id_fkey
+        FOREIGN KEY (area_id)
+        REFERENCES public.phc_areas(id),
+
+    CONSTRAINT families_asha_id_fkey
+        FOREIGN KEY (asha_id)
+        REFERENCES public.users(id),
+
+    CONSTRAINT families_workflow_check
+        CHECK (workflow_status IN ('draft','submitted','verified','locked'))
 );
 
-create trigger trg_families_updated
-before update on families
-for each row
-execute function update_timestamp();
+-- =========================================
+-- Indexes
+-- =========================================
+
+CREATE INDEX idx_families_area
+ON public.families(area_id);
+
+CREATE INDEX idx_families_asha
+ON public.families(asha_id);
+
+CREATE INDEX idx_families_active
+ON public.families(is_active);
+
+CREATE INDEX idx_families_version
+ON public.families(version);
+
+-- =========================================
+-- Trigger for Auto updated_at
+-- =========================================
+
+CREATE TRIGGER trg_families_updated
+BEFORE UPDATE ON public.families
+FOR EACH ROW
+EXECUTE FUNCTION update_timestamp();

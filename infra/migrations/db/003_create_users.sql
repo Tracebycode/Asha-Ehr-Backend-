@@ -1,39 +1,92 @@
-create table public.users (
-  id uuid not null default gen_random_uuid(),
-  name text not null,
-  phone text null,
-  role text not null,
-  phc_id uuid not null,
-  password_hash text null,
-  created_at timestamp without time zone default now(),
-  updated_at timestamp without time zone default now(),
-  status text not null default 'active',
-  created_by uuid null,
-  approved_by uuid null,
-  gender text null,
-  dob date null,
-  education_level text null,
+-- =========================================
+-- Users Table
+-- Healthcare workforce identity and RBAC root
+-- =========================================
 
-  constraint users_pkey primary key (id),
-  constraint users_phone_key unique (phone),
-  constraint users_phc_id_fkey
-    foreign key (phc_id) references phcs (id) on delete restrict,
-  constraint users_approved_by_fkey
-    foreign key (approved_by) references users (id),
-  constraint users_created_by_fkey
-    foreign key (created_by) references users (id),
+CREATE TABLE public.users (
 
-  constraint users_gender_check
-    check (gender = any (array['male', 'female', 'other'])),
+    -- Primary Identifier
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
-  constraint users_role_check
-    check (role = any (array['phc_admin', 'doctor', 'anm', 'asha'])),
+    -- Basic Identity
+    name TEXT NOT NULL,
+    phone TEXT UNIQUE,
+    gender TEXT,
+    dob DATE,
+    education_level TEXT,
 
-  constraint users_status_check
-    check (status = any (array['active', 'disabled']))
+    -- Role & Authority
+    role TEXT NOT NULL,
+    authority_level INTEGER NOT NULL,
+
+    -- PHC Ownership
+    phc_id UUID NOT NULL,
+
+    -- Authentication
+    password_hash TEXT,
+
+    -- Workflow & Lifecycle
+    status TEXT NOT NULL DEFAULT 'active',
+    is_active BOOLEAN DEFAULT TRUE,
+
+    -- Approval Chain
+    created_by UUID,
+    approved_by UUID,
+
+    -- Device & Offline Metadata
+    last_login_at TIMESTAMPTZ,
+    last_login_device TEXT,
+
+    -- Audit Metadata
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now(),
+
+    -- =========================================
+    -- Constraints
+    -- =========================================
+
+    CONSTRAINT users_phone_key UNIQUE (phone),
+
+    CONSTRAINT users_phc_id_fkey
+        FOREIGN KEY (phc_id)
+        REFERENCES public.phcs(id),
+
+    CONSTRAINT users_created_by_fkey
+        FOREIGN KEY (created_by)
+        REFERENCES public.users(id),
+
+    CONSTRAINT users_approved_by_fkey
+        FOREIGN KEY (approved_by)
+        REFERENCES public.users(id),
+
+    CONSTRAINT users_gender_check
+        CHECK (gender IN ('male', 'female', 'other')),
+
+    CONSTRAINT users_role_check
+        CHECK (role IN ('phc_admin', 'doctor', 'anm', 'asha')),
+
+    CONSTRAINT users_status_check
+        CHECK (status IN ('active', 'disabled'))
 );
 
-create trigger trg_users_updated
-before update on users
-for each row
-execute function update_timestamp();
+-- =========================================
+-- Indexes
+-- =========================================
+
+CREATE INDEX idx_users_phc
+ON public.users(phc_id);
+
+CREATE INDEX idx_users_role
+ON public.users(role);
+
+CREATE INDEX idx_users_active
+ON public.users(is_active);
+
+-- =========================================
+-- Trigger for Auto updated_at
+-- =========================================
+
+CREATE TRIGGER trg_users_updated
+BEFORE UPDATE ON public.users
+FOR EACH ROW
+EXECUTE FUNCTION update_timestamp();

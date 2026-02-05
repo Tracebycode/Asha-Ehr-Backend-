@@ -1,61 +1,146 @@
-create table public.health_records (
-  id uuid not null default gen_random_uuid(),
+-- =========================================
+-- Health Records Table
+-- Clinical visit + observation storage
+-- Highest medico-legal sensitivity table
+-- =========================================
 
-  phc_id uuid not null,
-  area_id uuid not null,
-  member_id uuid not null,
+CREATE TABLE public.health_records (
 
-  asha_id uuid not null,
+    -- Primary Identifier
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
-  task_id uuid null,
+    -- Administrative Ownership
+    phc_id UUID NOT NULL,
+    area_id UUID NOT NULL,
+    member_id UUID NOT NULL,
 
-  visit_type text not null,
-  data_json jsonb not null,
+    -- Record Author
+    asha_id UUID NOT NULL,
 
-  status text not null default 'PENDING',
+    task_id UUID,
 
-  -- offline-first metadata
-  device_id text null,
-  device_created_at timestamp without time zone default now(),
-  device_updated_at timestamp without time zone default now(),
-  synced_at timestamp without time zone null,
+    -- Clinical Metadata
+    visit_type TEXT NOT NULL,
+    data_json JSONB NOT NULL,
 
-  created_at timestamp without time zone default now(),
-  updated_at timestamp without time zone default now(),
+    -- =========================================
+    -- OCC Concurrency Metadata
+    -- =========================================
 
-  constraint health_records_pkey primary key (id),
+    version INTEGER NOT NULL DEFAULT 1,
 
-  constraint health_records_phc_id_fkey
-    foreign key (phc_id) references phcs (id) on delete restrict,
+    last_modified_by UUID,
+    last_modified_role TEXT,
+    last_modified_device TEXT,
 
-  constraint health_records_area_id_fkey
-    foreign key (area_id) references phc_areas (id) on delete restrict,
+    -- =========================================
+    -- Clinical Workflow Lifecycle
+    -- =========================================
 
-  constraint health_records_member_id_fkey
-    foreign key (member_id) references family_members (id) on delete cascade,
+    workflow_status TEXT DEFAULT 'draft',
 
-  constraint health_records_asha_id_fkey
-    foreign key (asha_id) references users (id) on delete restrict,
+    -- =========================================
+    -- Offline Sync Metadata
+    -- =========================================
 
-  constraint health_records_task_id_fkey
-    foreign key (task_id) references tasks (id) on delete set null,
+    device_id TEXT,
+    device_created_at TIMESTAMPTZ DEFAULT now(),
+    device_updated_at TIMESTAMPTZ DEFAULT now(),
+    synced_at TIMESTAMPTZ,
 
-  constraint health_records_status_check
-    check (status in ('PENDING', 'VERIFIED')),
+    -- =========================================
+    -- Soft Delete
+    -- =========================================
 
-  constraint health_records_visit_type_check
-    check (
-      visit_type in (
-        'general',
-        'anc',
-        'pnc',
-        'immunization',
-        'nutrition'
-      )
-    )
+    is_active BOOLEAN DEFAULT TRUE,
+
+    -- =========================================
+    -- Audit Metadata
+    -- =========================================
+
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now(),
+
+    -- =========================================
+    -- Constraints
+    -- =========================================
+
+    CONSTRAINT health_records_phc_id_fkey
+        FOREIGN KEY (phc_id)
+        REFERENCES public.phcs(id),
+
+    CONSTRAINT health_records_area_id_fkey
+        FOREIGN KEY (area_id)
+        REFERENCES public.phc_areas(id),
+
+    CONSTRAINT health_records_member_id_fkey
+        FOREIGN KEY (member_id)
+        REFERENCES public.family_members(id),
+
+    CONSTRAINT health_records_asha_id_fkey
+        FOREIGN KEY (asha_id)
+        REFERENCES public.users(id),
+
+    CONSTRAINT health_records_task_id_fkey
+        FOREIGN KEY (task_id)
+        REFERENCES public.tasks(id)
+        ON DELETE SET NULL,
+
+    CONSTRAINT health_records_visit_type_check
+        CHECK (
+            visit_type IN (
+                'general',
+                'anc',
+                'pnc',
+                'immunization',
+                'nutrition'
+            )
+        ),
+
+    CONSTRAINT health_records_workflow_check
+        CHECK (
+            workflow_status IN (
+                'draft',
+                'submitted',
+                'verified',
+                'locked',
+                'corrected'
+            )
+        )
 );
 
-create trigger trg_health_records_updated
-before update on health_records
-for each row
-execute function update_timestamp();
+-- =========================================
+-- JSONB Clinical Data Index
+-- =========================================
+
+CREATE INDEX idx_health_records_data
+ON public.health_records
+USING GIN (data_json);
+
+-- =========================================
+-- Performance Indexes
+-- =========================================
+
+CREATE INDEX idx_health_records_member
+ON public.health_records(member_id);
+
+CREATE INDEX idx_health_records_area
+ON public.health_records(area_id);
+
+CREATE INDEX idx_health_records_active
+ON public.health_records(is_active);
+
+CREATE INDEX idx_health_records_version
+ON public.health_records(version);
+
+CREATE INDEX idx_health_records_visit_type
+ON public.health_records(visit_type);
+
+-- =========================================
+-- Trigger for Auto updated_at
+-- =========================================
+
+CREATE TRIGGER trg_health_records_updated
+BEFORE UPDATE ON public.health_records
+FOR EACH ROW
+EXECUTE FUNCTION update_timestamp();

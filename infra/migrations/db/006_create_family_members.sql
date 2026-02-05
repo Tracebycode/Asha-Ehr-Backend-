@@ -1,53 +1,123 @@
-create table public.family_members (
-  id uuid not null default gen_random_uuid(),
+-- =========================================
+-- Family Members Table
+-- Patient identity registry
+-- High conflict + high medico-legal sensitivity
+-- =========================================
 
-  family_id uuid not null,
+CREATE TABLE public.family_members (
 
-  name text not null,
-  gender text null,
-  relation text null,
+    -- Primary Identifier
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
-  dob date null,
+    -- Household Ownership
+    family_id UUID NOT NULL,
 
-  adhar_number text null,
-  phone text null,
+    -- Patient Identity
+    name TEXT NOT NULL,
+    gender TEXT,
+    relation TEXT,
+    dob DATE,
 
-  is_alive boolean not null default true,
+    adhar_number TEXT,
+    phone TEXT,
 
-  next_visit_date date null,
+    -- Vital Status
+    is_alive BOOLEAN NOT NULL DEFAULT TRUE,
 
-  -- offline-first metadata
-  device_created_at timestamp without time zone default now(),
-  device_updated_at timestamp without time zone default now(),
-  synced_at timestamp without time zone null,
+    next_visit_date DATE,
 
-  created_at timestamp without time zone default now(),
-  updated_at timestamp without time zone default now(),
+    -- =========================================
+    -- Offline Concurrency Metadata
+    -- =========================================
 
-  constraint family_members_pkey primary key (id),
+    version INTEGER NOT NULL DEFAULT 1,
 
-  constraint family_members_family_id_fkey
-    foreign key (family_id) references families (id) on delete cascade,
+    last_modified_by UUID,
+    last_modified_role TEXT,
+    last_modified_device TEXT,
 
-  constraint family_members_gender_check
-    check (gender is null or gender in ('male', 'female', 'other')),
+    -- =========================================
+    -- Workflow Lifecycle
+    -- =========================================
 
-  constraint family_members_relation_check
-    check (
-      relation is null or relation in (
-        'head',
-        'spouse',
-        'son',
-        'daughter',
-        'father',
-        'mother',
-        'grandparent',
-        'other'
-      )
-    )
+    workflow_status TEXT DEFAULT 'draft',
+
+    -- =========================================
+    -- Offline Sync Metadata
+    -- =========================================
+
+    device_created_at TIMESTAMPTZ DEFAULT now(),
+    device_updated_at TIMESTAMPTZ DEFAULT now(),
+    synced_at TIMESTAMPTZ,
+
+    -- =========================================
+    -- Soft Delete
+    -- =========================================
+
+    is_active BOOLEAN DEFAULT TRUE,
+
+    -- =========================================
+    -- Audit Metadata
+    -- =========================================
+
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now(),
+
+    -- =========================================
+    -- Constraints
+    -- =========================================
+
+    CONSTRAINT family_members_family_id_fkey
+        FOREIGN KEY (family_id)
+        REFERENCES public.families(id),
+
+    CONSTRAINT family_members_gender_check
+        CHECK (gender IS NULL OR gender IN ('male','female','other')),
+
+    CONSTRAINT family_members_relation_check
+        CHECK (
+            relation IS NULL OR relation IN (
+                'head','spouse','son','daughter',
+                'father','mother','grandparent','other'
+            )
+        ),
+
+    CONSTRAINT family_members_workflow_check
+        CHECK (workflow_status IN ('draft','submitted','verified','locked'))
 );
 
-create trigger trg_family_members_updated
-before update on family_members
-for each row
-execute function update_timestamp();
+-- =========================================
+-- Unique Aadhaar Constraint (Nullable Safe)
+-- =========================================
+
+CREATE UNIQUE INDEX idx_family_members_adhar_unique
+ON public.family_members(adhar_number)
+WHERE adhar_number IS NOT NULL;
+
+-- =========================================
+-- Identity Search Indexes
+-- =========================================
+
+CREATE INDEX idx_family_members_family
+ON public.family_members(family_id);
+
+CREATE INDEX idx_family_members_name
+ON public.family_members(name);
+
+CREATE INDEX idx_family_members_dob
+ON public.family_members(dob);
+
+CREATE INDEX idx_family_members_active
+ON public.family_members(is_active);
+
+CREATE INDEX idx_family_members_version
+ON public.family_members(version);
+
+-- =========================================
+-- Trigger for Auto updated_at
+-- =========================================
+
+CREATE TRIGGER trg_family_members_updated
+BEFORE UPDATE ON public.family_members
+FOR EACH ROW
+EXECUTE FUNCTION update_timestamp();

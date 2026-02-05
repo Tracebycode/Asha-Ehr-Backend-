@@ -1,41 +1,97 @@
-create table public.sync_logs (
-  id uuid not null default gen_random_uuid(),
+-- =========================================
+-- Sync Logs Table
+-- Offline sync observability + conflict telemetry
+-- Core distributed system debugging infrastructure
+-- =========================================
 
-  user_id uuid null,
-  device_id text null,
+CREATE TABLE public.sync_logs (
 
-  entity_type text not null,
-  entity_id uuid null,
+    -- Primary Identifier
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
-  action text not null,
-  status text not null,
+    -- Sync Actor
+    user_id UUID,
+    device_id TEXT,
 
-  payload jsonb null,
-  error_message text null,
+    -- Operation Grouping
+    sync_batch_id UUID,
 
-  created_at timestamp without time zone default now(),
+    -- Entity Context
+    entity_type TEXT NOT NULL,
+    entity_id UUID,
 
-  constraint sync_logs_pkey primary key (id),
+    -- Operation Metadata
+    action TEXT NOT NULL,
+    status TEXT NOT NULL,
 
-  constraint sync_logs_user_id_fkey
-    foreign key (user_id) references users (id) on delete set null,
+    -- Version Tracking (OCC Debugging)
+    client_version INTEGER,
+    server_version INTEGER,
 
-  constraint sync_logs_action_check
-    check (
-      action in (
-        'CREATE',
-        'UPDATE',
-        'DELETE',
-        'SYNC'
-      )
-    ),
+    -- Conflict Telemetry
+    conflict_detected BOOLEAN DEFAULT FALSE,
+    conflict_resolved BOOLEAN DEFAULT FALSE,
 
-  constraint sync_logs_status_check
-    check (
-      status in (
-        'SUCCESS',
-        'FAILED',
-        'RETRIED'
-      )
-    )
+    -- Authority Context
+    user_role TEXT,
+
+    -- Retry Metadata
+    retry_count INTEGER DEFAULT 0,
+
+    -- Payload / Error Tracking
+    payload JSONB,
+    error_message TEXT,
+
+    -- Audit Metadata
+    created_at TIMESTAMPTZ DEFAULT now(),
+
+    -- =========================================
+    -- Constraints
+    -- =========================================
+
+    CONSTRAINT sync_logs_user_id_fkey
+        FOREIGN KEY (user_id)
+        REFERENCES public.users(id)
+        ON DELETE SET NULL,
+
+    CONSTRAINT sync_logs_action_check
+        CHECK (
+            action IN (
+                'CREATE',
+                'UPDATE',
+                'DELETE',
+                'SYNC'
+            )
+        ),
+
+    CONSTRAINT sync_logs_status_check
+        CHECK (
+            status IN (
+                'SUCCESS',
+                'FAILED',
+                'RETRIED'
+            )
+        )
 );
+
+-- =========================================
+-- Performance Indexes
+-- =========================================
+
+CREATE INDEX idx_sync_logs_user
+ON public.sync_logs(user_id);
+
+CREATE INDEX idx_sync_logs_entity
+ON public.sync_logs(entity_type, entity_id);
+
+CREATE INDEX idx_sync_logs_device
+ON public.sync_logs(device_id);
+
+CREATE INDEX idx_sync_logs_batch
+ON public.sync_logs(sync_batch_id);
+
+CREATE INDEX idx_sync_logs_conflict
+ON public.sync_logs(conflict_detected);
+
+CREATE INDEX idx_sync_logs_created
+ON public.sync_logs(created_at);
