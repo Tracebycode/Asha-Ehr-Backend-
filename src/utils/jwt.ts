@@ -1,31 +1,54 @@
 import jwt from "jsonwebtoken";
+import AppError from "./Apperror";
+
+const accessTokenSecret = process.env.ACCESS_TOKEN_SECRET;
+const refreshTokenSecret = process.env.REFRESH_TOKEN_SECRET;
 
 
 
-export const generateRefreshToken = (user: any) => {
-    return jwt.sign(
-        { userId: user.id },
-        process.env.REFRESH_TOKEN_SECRET,
+export const generateRefreshToken = (payload: any) => {
+    if(!refreshTokenSecret){
+        throw new AppError("Refresh token secret not found", 500);
+    }
+
+    const token = jwt.sign(
+        payload,
+        refreshTokenSecret,
         { expiresIn: "7d" }
     );
+    return token;
 };
 
 
-export const generateAccessToken = (user: any) => {
-    return jwt.sign(
-        { userId: user.id },
-        process.env.ACCESS_TOKEN_SECRET,
+export const generateAccessToken = (payload: any) => {
+
+
+    if(!accessTokenSecret){
+        throw new AppError("Access token secret not found", 500);
+    }
+    const token = jwt.sign(
+        payload,
+        accessTokenSecret,
         { expiresIn: "15m" }
     );
+    return token;
 };
 
 
 
 export const verifyRefreshToken = (token: string) => {
-    return jwt.verify(token, process.env.REFRESH_TOKEN_SECRET);
+    if(!refreshTokenSecret){
+        throw new AppError("Refresh token secret not found", 500);
+    }
+    const decoded = jwt.verify(token, refreshTokenSecret);
+    return decoded;
 };
 
 
 export const verifyAccessToken = (token: string) => {
-    return jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
+    if(!accessTokenSecret){
+        throw new AppError("Access token secret not found", 500);
+    }
+    const decoded = jwt.verify(token, accessTokenSecret);
+    return decoded;
 };
