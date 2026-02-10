@@ -1,5 +1,4 @@
-export interface Userdb{
-    id: string;
+export interface userType{
     name: string;
     phone: string;
     gender: string;
@@ -12,21 +11,3 @@ export interface Userdb{
     created_by: string;
     approved_by: string;
 }
-
-
-export interface LoginType{
-    phone: string;
-    password: string;
-}
-
-
-
-export interface jwtPayloadType{
-    id: string;
-    role: string;
-    phc_id: string;
-}
-
-
-
-

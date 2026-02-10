@@ -1,11 +1,11 @@
-const bcrypt = require("bcrypt");
+import bcrypt from "bcrypt";
 
 const SALT_ROUNDS = 10;
 
-exports.hashPassword = (password) => {
+export const hashPassword = (password: string) => {
   return bcrypt.hash(password, SALT_ROUNDS);
 };
 
-exports.comparePassword = (password, hash) => {
+export const comparePassword = (password: string, hash: string) => {
   return bcrypt.compare(password, hash);
 };

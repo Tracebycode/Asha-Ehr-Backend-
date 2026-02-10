@@ -1,10 +1,10 @@
 import { NextFunction, Request, Response } from "express";
-import { loginSchema } from "./auth.schema";
+import { createUserSchema } from "./users.schema";
 import AppError from "../../utils/Apperror";
 
-export const validateLogin = (req: Request, res: Response, next: NextFunction) => {
+export const validateCreateUser = (req: Request, res: Response, next: NextFunction) => {
     try{
-        const result = loginSchema.parse(req.body);
+        const result = createUserSchema.parse(req.body);
         next();
     }
     catch(error){

@@ -1,33 +1,22 @@
 import { LoginType } from "./auth.types";
-import { ClientPool } from "pg";
+import { PoolClient } from "pg";
 
-class AuthRepository {
+export const findUser = async (user: LoginType, client: PoolClient) => {
+    const query = `
+        SELECT * FROM users
+        WHERE phone = $1
+        AND is_active = $2
+        AND status = $3
+    `;
 
-    async findUser(user: LoginType,client:ClientPool){
-        const query = `
-            SELECT * FROM users(
-            phone,
-            is_active,
-            status    
-            )
-            values(
-                $1,
-                $2,
-                $3,
-                $4
-            )
-        `;
+    const values = [
+        user.phone,
+        true,
+        'active'
+    ];
 
-        const values = [
-            user.phone,
-            true,
-            'active'
-        ];
-
-        const result = await client.query(query, values);
-        return result.rows[0];
-    }
-    
+    const result = await client.query(query, values);
+    return result;
 }
 
-export default AuthRepository;
+export default { findUser };

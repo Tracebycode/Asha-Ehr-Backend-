@@ -1,26 +1,23 @@
 import AuthRepository from "./auth.repository";
-import { ClientPool } from "pg";
 import { comparePassword } from "../../lib/password";
 import { generateAccessToken } from "../../utils/jwt";
 import AppError from "../../utils/Apperror";
-import { LoginType } from "./auth.types";
+import { LoginType, Userdb } from "./auth.types";
+import pool from "../../lib/db";
 
 
 
 
-class AuthService {
-    static client = pool.connect();
-
-   async login(user: LoginType){
+export const loginservice = async (LoginCredentials: LoginType) => {
     try{
-        const client = await this.client;
+        const client = await pool.connect();
         client.query('begin');
-        const result = await AuthRepository.findUser(user,client);
+        const result:any = await AuthRepository.findUser(LoginCredentials,client);
         if(result.rows.length === 0){
             throw new AppError("User not found", 404);
         }
-        const user = result.rows[0];
-        const isPasswordValid = await comparePassword(user.password, user.password_hash);
+        const user:Userdb = result.rows[0];
+        const isPasswordValid = await comparePassword(LoginCredentials.password, user.password_hash);
         if(!isPasswordValid){
             throw new AppError("Invalid password", 401);
         }
@@ -35,10 +32,4 @@ class AuthService {
     catch(error){
         throw error;
     }
-   }
-
-    
-    
 }
-
-export default AuthService;
