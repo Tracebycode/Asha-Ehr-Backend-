@@ -7,5 +7,5 @@ export const createUserSchema = zod.object({
     dob: zod.string(),
     education_level: zod.string(),
     role: zod.string(),
-    password_hash: zod.string(),
+    password: zod.string(),
 });

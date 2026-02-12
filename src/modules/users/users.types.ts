@@ -11,3 +11,9 @@ export interface userType{
     created_by: string;
     approved_by: string;
 }
+
+export interface userdecoded{
+    id: string;
+    role: string;
+    phc_id: string;
+}
