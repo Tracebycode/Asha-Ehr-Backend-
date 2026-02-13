@@ -9,6 +9,9 @@ export const globalErrorHandler = (err: AppError, req: Request, res: Response, n
             errors: err.errors,
         });
     }
+
+
+    console.log(err);
     return res.status(500).json({
         message: "Internal Server Error",
     });

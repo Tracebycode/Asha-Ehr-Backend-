@@ -5,19 +5,27 @@ import {verifyAccessToken} from "../../utils/jwt";
 
 
 export const authenticateheader = (req: Request, res: Response, next: NextFunction) => {
-    try{
-        const token = req.headers.authorization;
-        if(!token){
-            throw new AppError("Unauthorized", 401);
-        }
-        const decodedToken = verifyAccessToken(token);
-        req.user = decodedToken;
-        next();
+  try {
+
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      throw new AppError("Unauthorized", 401);
     }
-    catch(error){
-     throw error;
-    }
-}
+
+    const token = authHeader.split(" ")[1];
+
+    const decodedToken = verifyAccessToken(token);
+
+    req.user = decodedToken;
+
+    next();
+
+  } catch (error) {
+    next(error);
+  }
+};
+
 
 
 export const authorizeRole = (role: string) => {
@@ -31,9 +39,9 @@ export const authorizeRole = (role: string) => {
 
 
 
-export const validateCreateUser = (req: Request, res: Response, next: NextFunction) => {
+export const validateCreateUser = async(req: Request, res: Response, next: NextFunction) => {
     try{
-        const result = createUserSchema.parse(req.body);
+        await createUserSchema.parseAsync(req.body);
         next();
     }
     catch(error){

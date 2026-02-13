@@ -7,9 +7,8 @@ export interface userType{
     role: string;
     authority_level: number;
     phc_id: string;
-    password_hash: string;
+    password: string;
     created_by: string;
-    approved_by: string;
 }
 
 export interface userdecoded{
