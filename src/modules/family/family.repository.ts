@@ -13,7 +13,6 @@ export const createFamily = async (family: any, client: PoolClient) => {
         family.head_member_id,
         family.address_line,
         family.landmark,
-        family.version,
         family.last_modified_by,
         family.last_modified_role,
         family.last_modified_device,
@@ -22,8 +21,7 @@ export const createFamily = async (family: any, client: PoolClient) => {
         family.device_updated_at,
         family.synced_at,
         family.is_active,
-        family.created_at,
-        family.updated_at,
+      
     ];
     const result = await client.query(query, values);
     return result.rows[0];
