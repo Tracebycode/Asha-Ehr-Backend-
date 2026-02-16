@@ -4,6 +4,7 @@ export const createFamilySchema = z.object({
     address_line: z.string(),
     landmark: z.string(),
     device_created_at: z.string(),
+    head_member_id: z.string(),
 });
 
 export const updateFamilySchema = z.object({
@@ -11,3 +12,6 @@ export const updateFamilySchema = z.object({
     landmark: z.string(),
     device_updated_at: z.string(),
 });
+
+
+

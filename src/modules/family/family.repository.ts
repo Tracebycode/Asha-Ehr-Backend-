@@ -26,3 +26,13 @@ export const createFamily = async (family: any, client: PoolClient) => {
     const result = await client.query(query, values);
     return result.rows[0];
 };
+
+
+
+export const findAreaByUserId = async (userid: string, client: PoolClient) => {
+    const query = `
+        SELECT * FROM user_area_map WHERE userid = $1;
+    `;
+    const result = await client.query(query, [userid]);
+    return result.rows[0];
+};

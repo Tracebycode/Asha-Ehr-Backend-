@@ -1,6 +1,6 @@
 import { NextFunction, Request, Response } from "express";
 import { verifyAccessToken } from "../../utils/jwt";
-import { familySchema } from "./family.schema";
+import { createFamilySchema } from "./family.schema";
 
 
 export const authenthicate =(req:Request,res:Response,next:NextFunction)=>{
@@ -38,7 +38,7 @@ export const authorize = (role : string) => {
 
 export const validateFamily = (req: Request, res: Response, next: NextFunction) => {
   try{
-    const result = familySchema.parse(req.body);
+    const result = createFamilySchema.parse(req.body);
     req.body = result;
     next();
   }catch(error){

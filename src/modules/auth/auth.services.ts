@@ -24,7 +24,8 @@ export const loginservice = async (LoginCredentials: LoginType) => {
         const payload = {
             id: user.id,
             role: user.role,
-            phc_id: user.phc_id
+            phc_id: user.phc_id,
+            
         };
         const token = generateAccessToken(payload);
         return token;

@@ -22,7 +22,7 @@ export interface LoginType{
 
 
 export interface jwtPayloadType{
-    id: string;
+    userid: string;
     role: string;
     phc_id: string;
 }

@@ -21,7 +21,6 @@ export interface userType{
     userid:string;
     role:string;
     phc_id:string;
-    area_id:string;
 }
 
 export interface familycreateType{
