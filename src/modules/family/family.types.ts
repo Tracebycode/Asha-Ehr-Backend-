@@ -17,11 +17,7 @@ export interface familytype{
 }
 
 
-export interface userType{
-    userid:string;
-    role:string;
-    phc_id:string;
-}
+
 
 export interface familycreateType{
     head_member_id:string;

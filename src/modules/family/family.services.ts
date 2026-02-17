@@ -1,9 +1,10 @@
 import { createFamily ,findAreaByUserId} from "./family.repository";
-import { familycreateType, userType } from "./family.types";
-import { pool } from "../../config/db";
+import { familycreateType } from "./family.types";
 import AppError from "../../utils/Apperror";
+import pool from "../../lib/db";
+import { userjwtType } from "../../types/userjwt";
 
-export async function createFamilyService(family:familycreateType,user:userType){
+export async function createFamilyService(family:familycreateType,user:userjwtType){
         const client = await pool.connect();
     try{
         client.query("BEGIN");

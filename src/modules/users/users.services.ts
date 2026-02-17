@@ -25,7 +25,7 @@ export const createUserService = async (Payload: createuserPayloadtype, user:use
     };
     const result = await createUser(newUser, client);
     client.query('commit');
-    return result;
+    return true;
 
    }catch(error){
     client.query('rollback');

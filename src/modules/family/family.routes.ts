@@ -1,11 +1,10 @@
 import express from "express";
 import { createFamilyController } from "./family.controller";
-import { authenthicate } from "./family.middleware";
-import { authorize } from "./family.middleware";
 import { validateFamily } from "./family.middleware";
+import { authenticateheader, authorize } from "../../middleware/auth";
 
 const router = express.Router();
 
-router.post("/",authenthicate,authorize("asha"),validateFamily, createFamilyController);
+router.post("/",authenticateheader,authorize("asha"),validateFamily, createFamilyController);
 
 export default router;

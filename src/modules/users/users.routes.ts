@@ -1,9 +1,10 @@
 import { Router } from "express";
 import { createUserController } from "./users.controller";
-import { validateCreateUser, authenticateheader, authorizeRole } from "./users.middleware";
+import { validateCreateUser } from "./users.middleware";
+import { authenticateheader, authorize } from "../../middleware/auth";
 
 const router = Router();
 
-router.post("/create",authenticateheader, authorizeRole("phc_admin"), validateCreateUser, createUserController);
+router.post("/create",authenticateheader, authorize("phc_admin"), validateCreateUser, createUserController);
 
 export default router;

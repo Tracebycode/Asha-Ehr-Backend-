@@ -31,7 +31,7 @@ export const createFamily = async (family: any, client: PoolClient) => {
 
 export const findAreaByUserId = async (userid: string, client: PoolClient) => {
     const query = `
-        SELECT * FROM user_area_map WHERE userid = $1;
+        SELECT * FROM user_area_map WHERE user_id = $1;
     `;
     const result = await client.query(query, [userid]);
     return result.rows[0];

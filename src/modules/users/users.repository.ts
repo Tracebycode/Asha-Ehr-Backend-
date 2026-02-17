@@ -20,5 +20,5 @@ export const createUser = async (user: createUserType, client: PoolClient) => {
        
     ];
     const result = await client.query(query, values);
-    return result;
+    return result.rows[0];
 }

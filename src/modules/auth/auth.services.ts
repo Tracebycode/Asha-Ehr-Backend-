@@ -22,7 +22,7 @@ export const loginservice = async (LoginCredentials: LoginType) => {
             throw new AppError("Invalid password", 401);
         }
         const payload = {
-            id: user.id,
+            userid: user.id,
             role: user.role,
             phc_id: user.phc_id,
             
