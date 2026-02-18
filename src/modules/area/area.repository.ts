@@ -6,11 +6,10 @@ export const assignarearepo = async (data:assignareaType,client:PoolClient)=>{
     user_area_map(
     user_id,
     area_id,
-    phc_id,
     assigned_by,
     is_active)
-    values($1,$2,$3,$4,$5)`;
-    const values = [data.user_id, data.area_id,data.phc_id,data.assigned_by,true];
+    values($1,$2,$3,$4)`;
+    const values = [data.user_id, data.area_id,data.assigned_by,true];
     const result = await client.query(query, values);
     return result.rows[0];
 }

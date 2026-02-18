@@ -3,6 +3,7 @@ import z from "zod";
 export const createFamilySchema = z.object({
     address_line: z.string(),
     landmark: z.string(),
+    device_name: z.string(),
     device_created_at: z.string(),
     head_member_id: z.string(),
 });

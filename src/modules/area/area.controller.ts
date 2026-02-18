@@ -10,7 +10,7 @@ export const assignareacontroller = async (req: Request, res: Response, next: Ne
         const user = req.user;
         const data = req.body;
         const result = await assignareaservice(data, user as userjwtType);
-        res.json(result);
+        res.status(200).json({message:"Area assigned successfully",result});
     } catch (error) {
         next(error);
     }
