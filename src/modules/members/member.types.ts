@@ -1,14 +1,11 @@
 // ─── DB-level type (used in repository) ───────────────────────────────────────
 export interface MemberType {
     family_id: string;
-    phc_id: string;
-    area_id: string;
-    asha_id: string;
     full_name: string;
     gender: string;
     date_of_birth: string;
     relation_to_head: string;
-    aadhaar_number?: string | null;
+    adhar_number?: string | null;
     mobile_number?: string | null;
     last_modified_by: string;
     last_modified_role: string;
@@ -23,7 +20,7 @@ export interface MemberCreateType {
     gender: string;
     date_of_birth: string;
     relation_to_head: string;
-    aadhaar_number?: string | null;
+    adhar_number?: string | null;
     mobile_number?: string | null;
     device_name: string;
     device_created_at: string;

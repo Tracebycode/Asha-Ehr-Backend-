@@ -12,6 +12,10 @@ import {
 } from "./member.repository";
 import { MemberCreateType, MemberUpdateType, MemberWorkflowType } from "./member.types";
 
+
+
+
+
 // ─── Allowed workflow transitions ──────────────────────────────────────────────
 const WORKFLOW_TRANSITIONS: Record<string, string[]> = {
     draft: ["submitted"],
@@ -39,8 +43,8 @@ export async function createMemberService(
         }
 
         // Aadhaar uniqueness check (only when provided)
-        if (body.aadhaar_number) {
-            const existing = await findMemberByAadhaar(body.aadhaar_number, null, client);
+        if (body.adhar_number) {
+            const existing = await findMemberByAadhaar(body.adhar_number, null, client);
             if (existing) {
                 throw new AppError("A member with this Aadhaar number already exists", 409);
             }
@@ -48,14 +52,11 @@ export async function createMemberService(
 
         const newMember = {
             family_id: body.family_id,
-            phc_id: family.phc_id,
-            area_id: family.area_id,
-            asha_id: family.asha_id,
             full_name: body.full_name,
             gender: body.gender,
             date_of_birth: body.date_of_birth,
             relation_to_head: body.relation_to_head,
-            aadhaar_number: body.aadhaar_number ?? null,
+            adhar_number: body.adhar_number ?? null,
             mobile_number: body.mobile_number ?? null,
             last_modified_by: user.userid,
             last_modified_role: user.role,
@@ -77,6 +78,7 @@ export async function createMemberService(
 
 
 // ─── Update ────────────────────────────────────────────────────────────────────
+
 export async function updateMemberService(
     id: string,
     body: MemberUpdateType,

@@ -1,34 +1,34 @@
 import { NextFunction, Request, Response } from "express";
 import { userjwtType } from "../../types/userjwt";
 import {
-    createMemberService,
-    deleteMemberService,
-    transitionMemberWorkflowService,
-    updateMemberService,
-} from "./member.services";
-
+    createHealthRecordService,
+    deleteHealthRecordService,
+    transitionHealthRecordWorkflowService,
+    updateHealthRecordService,
+} from "./health.services";
 
 
 
 // ─── Create ────────────────────────────────────────────────────────────────────
-export const createMemberController = async (
+export const createHealthRecordController = async (
     req: Request,
     res: Response,
     next: NextFunction
 ) => {
     try {
         const user = req.user as userjwtType;
-         await createMemberService(req.body, user);
-        return res.status(201).json({ message: "Member created successfully"});
+        await createHealthRecordService(req.body, user);
+        return res.status(201).json({ message: "Health record created successfully" });
     } catch (error) {
         next(error);
     }
 };
+
 
 
 
 // ─── Update ────────────────────────────────────────────────────────────────────
-export const updateMemberController = async (
+export const updateHealthRecordController = async (
     req: Request,
     res: Response,
     next: NextFunction
@@ -36,17 +36,15 @@ export const updateMemberController = async (
     try {
         const user = req.user as userjwtType;
         const { id } = req.params as { id: string };
-        const member = await updateMemberService(id, req.body, user);
-        return res.status(200).json({ message: "Member updated successfully", member });
+        const record = await updateHealthRecordService(id, req.body, user);
+        return res.status(200).json({ message: "Health record updated successfully", record });
     } catch (error) {
         next(error);
     }
 };
-
-
 
 // ─── Soft delete ───────────────────────────────────────────────────────────────
-export const deleteMemberController = async (
+export const deleteHealthRecordController = async (
     req: Request,
     res: Response,
     next: NextFunction
@@ -54,18 +52,15 @@ export const deleteMemberController = async (
     try {
         const user = req.user as userjwtType;
         const { id } = req.params as { id: string };
-        const member = await deleteMemberService(id, user);
-        return res.status(200).json({ message: "Member deleted successfully", member });
+        const record = await deleteHealthRecordService(id, user);
+        return res.status(200).json({ message: "Health record deleted successfully", record });
     } catch (error) {
         next(error);
     }
 };
 
-
-
-
 // ─── Workflow transition ───────────────────────────────────────────────────────
-export const transitionMemberWorkflowController = async (
+export const transitionHealthRecordWorkflowController = async (
     req: Request,
     res: Response,
     next: NextFunction
@@ -73,8 +68,8 @@ export const transitionMemberWorkflowController = async (
     try {
         const user = req.user as userjwtType;
         const { id } = req.params as { id: string };
-        const member = await transitionMemberWorkflowService(id, req.body, user);
-        return res.status(200).json({ message: "Workflow updated successfully", member });
+        const record = await transitionHealthRecordWorkflowService(id, req.body, user);
+        return res.status(200).json({ message: "Workflow updated successfully", record });
     } catch (error) {
         next(error);
     }

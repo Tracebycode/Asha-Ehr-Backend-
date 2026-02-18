@@ -1,106 +1,106 @@
 import { PoolClient } from "pg";
-import { MemberType } from "./member.types";
+import { HealthRecordEntity } from "./health.types";
 
 // ─── Create ────────────────────────────────────────────────────────────────────
-export const createMember = async (member: MemberType, client: PoolClient) => {
+export const createHealthRecord = async (
+    record: HealthRecordEntity,
+    client: PoolClient
+) => {
     const query = `
-    INSERT INTO family_members (
-      family_id,
-      name, gender, dob, relation,
-      adhar_number, phone,
+    INSERT INTO health_records (
+      phc_id, area_id, member_id, asha_id, task_id,
+      visit_type, data_json,
       last_modified_by, last_modified_role, last_modified_device,
-      synced_at
+      device_id, device_created_at, device_updated_at, synced_at
     )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
     RETURNING *;
   `;
     const values = [
-        member.family_id,
-        member.full_name,
-        member.gender,
-        member.date_of_birth,
-        member.relation_to_head,
-        member.adhar_number ?? null,
-        member.mobile_number ?? null,
-        member.last_modified_by,
-        member.last_modified_role,
-        member.last_modified_device,
-        member.synced_at,
+        record.phc_id,
+        record.area_id,
+        record.member_id,
+        record.asha_id,
+        record.task_id ?? null,
+        record.visit_type,
+        JSON.stringify(record.data_json),   // explicit cast keeps JSONB intact
+        record.last_modified_by,
+        record.last_modified_role,
+        record.last_modified_device,
+        record.device_id,
+        record.device_created_at,
+        record.device_updated_at,
+        record.synced_at ?? null,
     ];
     const result = await client.query(query, values);
     return result.rows[0];
 };
 
-
-
-
 // ─── Find by ID ────────────────────────────────────────────────────────────────
-
-export const findMemberById = async (id: string, client: PoolClient) => {
+export const findHealthRecordById = async (
+    id: string,
+    client: PoolClient
+) => {
     const query = `
-    SELECT * FROM family_members
+    SELECT * FROM health_records
     WHERE id = $1 AND is_active = true;
   `;
     const result = await client.query(query, [id]);
     return result.rows[0] ?? null;
 };
 
- 
-// ─── Check Aadhaar uniqueness (partial index – only active records) ────────────
-export const findMemberByAadhaar = async (
-    adhar: string,
-    excludeId: string | null,
+// ─── Find member's area/asha ownership (for access control) ───────────────────
+// Returns the area_id and asha_id that own the family_member so the service
+// can verify the requesting ASHA belongs to the same area.
+export const findMemberContext = async (
+    memberId: string,
     client: PoolClient
 ) => {
-    const query = excludeId
-        ? `SELECT id FROM family_members WHERE adhar_number = $1 AND is_active = true AND id <> $2 LIMIT 1;`
-        : `SELECT id FROM family_members WHERE adhar_number = $1 AND is_active = true LIMIT 1;`;
-
-    const values = excludeId ? [adhar, excludeId] : [adhar];
-    const result = await client.query(query, values);
+    const query = `
+    SELECT fm.id, f.phc_id, f.area_id, f.asha_id
+    FROM family_members fm
+    JOIN families f ON f.id = fm.family_id
+    WHERE fm.id = $1 AND fm.is_active = true AND f.is_active = true;
+  `;
+    const result = await client.query(query, [memberId]);
     return result.rows[0] ?? null;
 };
 
-// ─── Update ────────────────────────────────────────────────────────────────────
-export const updateMember = async (
+// ─── Update (optimistic locking) ──────────────────────────────────────────────
+export const updateHealthRecord = async (
     id: string,
     fields: {
-        full_name?: string;
-        gender?: string;
-        date_of_birth?: string;
-        relation_to_head?: string;
-        aadhaar_number?: string | null;
-        mobile_number?: string | null;
+        data_json?: Record<string, unknown>;
+        task_id?: string | null;
         last_modified_by: string;
         last_modified_role: string;
         last_modified_device: string;
+        device_id: string;
         device_updated_at: string;
+        synced_at?: string | null;
     },
     currentVersion: number,
     client: PoolClient
 ) => {
-    // Build SET clause dynamically from provided optional fields
     const setClauses: string[] = [];
     const values: unknown[] = [];
     let idx = 1;
 
-    const optionalFields: (keyof typeof fields)[] = [
-        "full_name",
-        "gender",
-        "date_of_birth",
-        "relation_to_head",
-        "aadhaar_number",
-        "mobile_number",
-    ];
-
-    for (const key of optionalFields) {
-        if (fields[key] !== undefined) {
-            setClauses.push(`${key} = $${idx++}`);
-            values.push(fields[key]);
-        }
+    // Optional fields – only set when provided
+    if (fields.data_json !== undefined) {
+        setClauses.push(`data_json = $${idx++}`);
+        values.push(JSON.stringify(fields.data_json));
+    }
+    if (fields.task_id !== undefined) {
+        setClauses.push(`task_id = $${idx++}`);
+        values.push(fields.task_id);
+    }
+    if (fields.synced_at !== undefined) {
+        setClauses.push(`synced_at = $${idx++}`);
+        values.push(fields.synced_at);
     }
 
-    // Always update audit + version + timestamps
+    // Always update audit + device + version + timestamp
     setClauses.push(`last_modified_by = $${idx++}`);
     values.push(fields.last_modified_by);
 
@@ -109,6 +109,9 @@ export const updateMember = async (
 
     setClauses.push(`last_modified_device = $${idx++}`);
     values.push(fields.last_modified_device);
+
+    setClauses.push(`device_id = $${idx++}`);
+    values.push(fields.device_id);
 
     setClauses.push(`device_updated_at = $${idx++}`);
     values.push(fields.device_updated_at);
@@ -123,7 +126,7 @@ export const updateMember = async (
     const versionIdx = idx++;
 
     const query = `
-    UPDATE family_members
+    UPDATE health_records
     SET ${setClauses.join(", ")}
     WHERE id = $${idIdx} AND version = $${versionIdx} AND is_active = true
     RETURNING *;
@@ -134,7 +137,7 @@ export const updateMember = async (
 };
 
 // ─── Soft delete ───────────────────────────────────────────────────────────────
-export const softDeleteMember = async (
+export const softDeleteHealthRecord = async (
     id: string,
     lastModifiedBy: string,
     lastModifiedRole: string,
@@ -142,7 +145,7 @@ export const softDeleteMember = async (
     client: PoolClient
 ) => {
     const query = `
-    UPDATE family_members
+    UPDATE health_records
     SET
       is_active = false,
       last_modified_by = $2,
@@ -161,31 +164,30 @@ export const softDeleteMember = async (
     return result.rows[0] ?? null;
 };
 
-
-
-
 // ─── Workflow transition ───────────────────────────────────────────────────────
-export const updateMemberWorkflow = async (
+export const updateHealthRecordWorkflow = async (
     id: string,
     newStatus: string,
     lastModifiedBy: string,
     lastModifiedRole: string,
     lastModifiedDevice: string,
+    deviceId: string,
     deviceUpdatedAt: string,
     currentVersion: number,
     client: PoolClient
 ) => {
     const query = `
-    UPDATE family_members
+    UPDATE health_records
     SET
       workflow_status = $1,
       last_modified_by = $2,
       last_modified_role = $3,
       last_modified_device = $4,
-      device_updated_at = $5,
+      device_id = $5,
+      device_updated_at = $6,
       version = version + 1,
       updated_at = NOW()
-    WHERE id = $6 AND version = $7 AND is_active = true
+    WHERE id = $7 AND version = $8 AND is_active = true
     RETURNING *;
   `;
     const result = await client.query(query, [
@@ -193,20 +195,10 @@ export const updateMemberWorkflow = async (
         lastModifiedBy,
         lastModifiedRole,
         lastModifiedDevice,
+        deviceId,
         deviceUpdatedAt,
         id,
         currentVersion,
     ]);
-    return result.rows[0] ?? null;
-};
-
-// ─── Lookup family (to inherit phc_id / area_id / asha_id) ───────────────────
-export const findFamilyById = async (familyId: string, client: PoolClient) => {
-    const query = `
-    SELECT id, phc_id, area_id, asha_id
-    FROM families
-    WHERE id = $1 AND is_active = true;
-  `;
-    const result = await client.query(query, [familyId]);
     return result.rows[0] ?? null;
 };

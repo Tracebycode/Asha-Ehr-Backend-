@@ -13,6 +13,8 @@ export const createMemberSchema = z.object({
     device_created_at: z.string().min(1, "device_created_at is required"),
 });
 
+
+
 // ─── Update ────────────────────────────────────────────────────────────────────
 export const updateMemberSchema = z.object({
     full_name: z.string().min(1).optional(),
