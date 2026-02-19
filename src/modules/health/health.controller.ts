@@ -9,6 +9,7 @@ import {
 
 
 
+
 // ─── Create ────────────────────────────────────────────────────────────────────
 export const createHealthRecordController = async (
     req: Request,
@@ -23,6 +24,10 @@ export const createHealthRecordController = async (
         next(error);
     }
 };
+
+
+
+
 
 
 
@@ -43,6 +48,7 @@ export const updateHealthRecordController = async (
     }
 };
 
+
 // ─── Soft delete ───────────────────────────────────────────────────────────────
 export const deleteHealthRecordController = async (
     req: Request,
@@ -58,6 +64,8 @@ export const deleteHealthRecordController = async (
         next(error);
     }
 };
+
+
 
 // ─── Workflow transition ───────────────────────────────────────────────────────
 export const transitionHealthRecordWorkflowController = async (

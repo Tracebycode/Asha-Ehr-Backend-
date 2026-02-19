@@ -12,17 +12,17 @@ export const createHealthRecordSchema = z.object({
     member_id: z.string().uuid("member_id must be a valid UUID"),
     task_id: z.string().uuid("task_id must be a valid UUID").optional().nullable(),
     visit_type: visitTypeEnum,
-    // data_json accepts any object – structure varies per visit_type
-    data_json: z.record(z.unknown()),
+    data_json: z.object({}),
     device_id: z.string().min(1, "device_id is required"),
     device_created_at: z.string().min(1, "device_created_at is required"),
     device_updated_at: z.string().min(1, "device_updated_at is required"),
     synced_at: z.string().optional().nullable(),
 });
 
+
 // ─── Update ────────────────────────────────────────────────────────────────────
 export const updateHealthRecordSchema = z.object({
-    data_json: z.record(z.unknown()).optional(),
+    data_json: z.object({}),
     task_id: z.string().uuid("task_id must be a valid UUID").optional().nullable(),
     version: z.number().int().positive("version is required"),
     device_id: z.string().min(1, "device_id is required"),
