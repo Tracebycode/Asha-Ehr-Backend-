@@ -7,6 +7,7 @@ import familyRoutes from "./modules/family/family.routes";
 import areaRoutes from "./modules/area/area.routes";
 import memberRoutes from "./modules/members/member.routes";
 import healthRoutes from "./modules/health/health.routes";
+import syncRoutes from "./modules/sync/sync.routes";
 
 const app = express();
 app.use(cors());
@@ -21,6 +22,7 @@ app.use("/api/areas", areaRoutes);
 app.use("/api/families", familyRoutes);
 app.use("/api/members", memberRoutes);
 app.use("/api/health-records", healthRoutes);
+app.use("/api/sync", syncRoutes);
 
 
 
