@@ -13,6 +13,8 @@ import {
 // ─── Strictly ordered table list (FK dependency order) ────────────────────────
 // families → family_members → health_records → tasks
 
+
+
 const TABLE_ORDER: Array<keyof SyncRequestBody["changes"]> = [
     "families",
     "family_members",
@@ -50,6 +52,9 @@ export const processSyncService = async (
             const dbTable = tableKey; // keys are already snake_case matching DB table names
             await applyTableChanges(dbTable, changes, applied, conflicts, client);
         }
+
+
+        
 
         // ── 3. Delta pull ─────────────────────────────────────────────────────────
         const { changes: deltaChanges, new_sync_seq } = await pullAllDeltas(

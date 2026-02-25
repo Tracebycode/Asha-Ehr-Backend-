@@ -7,6 +7,7 @@ import { SyncChange, AppliedEntry, ConflictEntry, DeltaChanges } from "./sync.ty
  * Check if a request_id has already been processed.
  * Returns the stored response payload if found, or null if this is a new request.
  */
+
 export const findStoredSyncResponse = async (
     requestId: string,
     client: PoolClient
@@ -55,6 +56,16 @@ const findRowById = async (
     );
     return result.rows[0] ?? null;
 };
+
+
+
+
+
+
+
+
+
+
 
 // ─── Insert ───────────────────────────────────────────────────────────────────
 

@@ -20,3 +20,5 @@ export const syncController = async (
         next(error);
     }
 };
+
+
