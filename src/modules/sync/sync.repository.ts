@@ -97,18 +97,8 @@ export const insertRow = async (
         values.push(typeof val === "object" && val !== null ? JSON.stringify(val) : val);
     }
 
-    // $placeholders
-    const placeholders = allCols.map((_, i) => `$${i + 1}`).join(", ");
-    // Append controlled constants at the end
-    const query = `
-    INSERT INTO ${table} (${allCols.join(", ")})
-    VALUES (${placeholders.slice(0, -allCols.length + values.length)}, 
-            1, true, nextval('global_sync_seq'), NOW(), NOW())
-    ON CONFLICT (id) DO NOTHING
-  `;
+   
 
-    // Rebuild properly: values already has change.id + userCols values
-    // Build a clean parameterised query without any expression injection
     const cleanCols = ["id", ...userCols, "version", "is_active", "sync_seq", "created_at", "updated_at"];
     const cleanPlaceholders: string[] = [];
     for (let i = 1; i <= values.length; i++) {
@@ -130,6 +120,8 @@ export const insertRow = async (
     const result = await client.query(cleanQuery, values);
     return result.rowCount && result.rowCount > 0 ? "inserted" : "skipped";
 };
+
+
 
 // ─── Update ───────────────────────────────────────────────────────────────────
 
