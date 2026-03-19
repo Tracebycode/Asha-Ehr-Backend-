@@ -88,7 +88,6 @@ export const insertRow = async (
     // Build column list and value list dynamically, excluding protected columns
     const PROTECTED = new Set(["id", "version", "is_active", "sync_seq", "created_at", "updated_at"]);
     const userCols = Object.keys(data).filter((k) => !PROTECTED.has(k));
-    const allCols = ["id", ...userCols, "version", "is_active", "sync_seq", "created_at", "updated_at"];
 
     const values: unknown[] = [change.id];
     for (const col of userCols) {
@@ -188,6 +187,8 @@ export const updateRow = async (
             server_data: {},
         };
     }
+
+    
     return {
         table,
         id: change.id,
