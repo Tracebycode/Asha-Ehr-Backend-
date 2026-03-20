@@ -1,5 +1,45 @@
 import { PoolClient } from "pg";
-import { SyncChange, AppliedEntry, ConflictEntry, DeltaChanges } from "./sync.types";
+import pool from "../../lib/db";
+import { SyncChange, AppliedEntry, ConflictEntry, DeltaChanges, ashadatatype, AshaContext } from "./sync.types";
+
+
+// ─── ASHA ownership fetch ─────────────────────────────────────────────────────
+
+/**
+ * Fetch the authoritative ASHA record for the authenticated user.
+ * Called ONCE per sync request, BEFORE the transaction begins, so we stay
+ * outside the main pool-client and avoid holding the connection longer.
+ *
+ * Throws if no asha_workers row is found for the given user_id — this means
+ * the JWT belongs to a non-ASHA user who should not be syncing.
+ */
+export const FetchAshaData = async (userId: string): Promise<ashadatatype> => {
+    const result = await pool.query(
+        `
+        SELECT 
+            u.id AS user_id,
+            u.phc_id,
+            u.role,
+            uam.area_id
+        FROM users u
+        JOIN user_area_map uam 
+            ON u.id = uam.user_id
+        WHERE u.id = $1
+          AND u.is_active = true
+          AND uam.is_active = true
+        LIMIT 1
+        `,
+        [userId]
+    );
+
+    if (result.rows.length === 0) {
+        throw new Error(`No active ASHA mapping found for user_id: ${userId}`);
+    }
+
+    return result.rows[0];
+};
+
+
 
 // ─── Idempotency ──────────────────────────────────────────────────────────────
 
@@ -58,6 +98,18 @@ const findRowById = async (
 };
 
 
+//ownership field for every table
+
+const ownershipConfig:Record<string,(keyof AshaContext)[]> ={
+    families:["phc_id","asha_id","area_id"],
+    family_members:[],
+    health_records:["phc_id","asha_id","area_id"],
+    tasks:[],
+}
+
+
+
+
 
 
 
@@ -80,7 +132,8 @@ const findRowById = async (
 export const insertRow = async (
     table: string,
     change: SyncChange,
-    client: PoolClient
+    client: PoolClient,
+    asha: AshaContext
 ): Promise<"inserted" | "skipped"> => {
     // Merge caller data but always override sync-critical fields
     const data = { ...change.data };
@@ -188,7 +241,7 @@ export const updateRow = async (
         };
     }
 
-    
+
     return {
         table,
         id: change.id,
@@ -318,11 +371,27 @@ export const applyTableChanges = async (
     changes: SyncChange[],
     applied: AppliedEntry[],
     conflicts: ConflictEntry[],
-    client: PoolClient
+    client: PoolClient,
+    asha: AshaContext          // ← server-side ownership + audit context
 ): Promise<void> => {
     for (const change of changes) {
+        // ── Ownership + audit override ───────────────────────────────────────────
+        // Always replace client-supplied values with server-authoritative ones.
+        // This runs for every operation (insert / update / delete) so no path
+        // can bypass the enforcement.
+      const fields = ownershipConfig[table] || [];
+
+        for (const field of fields) {
+            const value = asha[field];
+            if (!value) {
+                throw new Error(`Missing ${field} for table ${table}`);
+            }
+            change.data[field] = value;
+}
+        // ────────────────────────────────────────────────────────────────────────
+
         if (change.operation === "insert") {
-            const outcome = await insertRow(table, change, client);
+            const outcome = await insertRow(table, change, client, asha);
             if (outcome === "inserted" || outcome === "skipped") {
                 // Both count as applied — the idempotency case (skipped) means the row
                 // is already there, so the client's intent was fulfilled.

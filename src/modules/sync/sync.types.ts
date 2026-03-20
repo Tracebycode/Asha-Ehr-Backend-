@@ -54,3 +54,29 @@ export interface SyncResponse {
     changes: DeltaChanges;
     new_sync_seq: number;
 }
+
+
+
+// Shape returned by FetchAshaData — maps directly to asha_workers DB columns
+export interface ashadatatype {
+    user_id: string;
+    phc_id: string;
+    area_id: string;
+}
+
+/**
+ * Bundle of server-side ownership + audit values that are injected into every
+ * sync change before it is written to the DB.  Built ONCE per request from
+ * the JWT user and the single ASHA DB fetch.
+ */
+
+
+export interface AshaContext {
+    // ownership — overrides whatever the client sent
+    asha_id: string;
+    phc_id: string;
+    area_id: string;
+    // audit — who last touched the row
+    last_modified_by: string;
+    last_modified_role: string;
+}

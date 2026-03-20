@@ -5,7 +5,13 @@ import { syncRequestSchema } from "./sync.schema";
 /**
  * Validate and coerce the incoming sync request body against the Zod schema.
  * On failure, throws a 400 AppError with the first Zod issue as context.
+ * 
+ * 
+ * 
+ * 
  */
+
+
 export const validateSyncRequest = (
     req: Request,
     res: Response,
