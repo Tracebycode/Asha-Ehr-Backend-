@@ -14,7 +14,7 @@ export const syncController = async (
         const user = req.user as userjwtType;
         const body = req.body as SyncRequestBody;
 
-        const result = await processSyncService(body, user.userid, user.role);
+        const result = await processSyncService(body, user);
         res.status(200).json(result);
     } catch (error) {
         next(error);

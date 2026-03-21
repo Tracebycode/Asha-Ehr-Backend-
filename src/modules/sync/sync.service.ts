@@ -7,6 +7,7 @@ import {
     pullAllDeltas,
     FetchAshaData
 } from "./sync.repository";
+import { userjwtType } from "../../types/userjwt";
 
 
 
@@ -27,8 +28,7 @@ const TABLE_ORDER: Array<keyof SyncRequestBody["changes"]> = [
 
 export const processSyncService = async (
     body: SyncRequestBody,
-    userId: string,
-    userRole: string        // ← from JWT; used for last_modified_role
+    user: userjwtType        // ← from JWT; used for last_modified_role
 ): Promise<SyncResponse> => {
     const client = await pool.connect();
 
@@ -50,15 +50,15 @@ export const processSyncService = async (
         
 
         //── Fetch ASHA record ONCE (server-authoritative, never trusted from client) ──
-        const ashaRecord = await FetchAshaData(userId);
+        const ashaRecord = await FetchAshaData(user.userid);
 
         // Build the immutable context passed into every applyTableChanges call
         const ashaCtx: AshaContext = {
             asha_id:            ashaRecord.user_id,
             phc_id:             ashaRecord.phc_id,
             area_id:            ashaRecord.area_id,
-            last_modified_by:   userId,
-            last_modified_role: userRole,
+            last_modified_by:   user.userid,
+            last_modified_role: user.role,
         };
         console.log("ashaCtx", ashaCtx);
 
@@ -72,26 +72,35 @@ export const processSyncService = async (
         }
 
 
+
+
+
+
+
+
+
         
 
         // ── 3. Delta pull ─────────────────────────────────────────────────────────
-        const { changes: deltaChanges, new_sync_seq } = await pullAllDeltas(
-            body.last_sync_seq,
-            client
-        );
+        // const { changes: deltaChanges, new_sync_seq } = await pullAllDeltas(
+        //     body.last_sync_seq,
+        //     client
+        // );
+
+
 
         // ── 4. Build response ─────────────────────────────────────────────────────
         const response: SyncResponse = {
             applied,
             conflicts,
-            changes: deltaChanges,
-            new_sync_seq,
+            // changes: deltaChanges,
+            // new_sync_seq,
         };
 
         // ── 5. Persist idempotency record inside same transaction ─────────────────
         await storeSyncResponse(
             body.request_id,
-            userId,
+            user.userid,
             body.device_id,
             response as unknown as Record<string, unknown>,
             client

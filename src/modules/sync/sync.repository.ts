@@ -1,117 +1,72 @@
 import { PoolClient } from "pg";
 import pool from "../../lib/db";
 import { SyncChange, AppliedEntry, ConflictEntry, DeltaChanges, ashadatatype, AshaContext } from "./sync.types";
+import AppError from "../../utils/Apperror";
+import { version } from "node:os";
 
-
-// ─── ASHA ownership fetch ─────────────────────────────────────────────────────
-
-/**
- * Fetch the authoritative ASHA record for the authenticated user.
- * Called ONCE per sync request, BEFORE the transaction begins, so we stay
- * outside the main pool-client and avoid holding the connection longer.
- *
- * Throws if no asha_workers row is found for the given user_id — this means
- * the JWT belongs to a non-ASHA user who should not be syncing.
- */
-export const FetchAshaData = async (userId: string): Promise<ashadatatype> => {
-    const result = await pool.query(
-        `
-        SELECT 
-            u.id AS user_id,
-            u.phc_id,
-            u.role,
-            uam.area_id
-        FROM users u
-        JOIN user_area_map uam 
-            ON u.id = uam.user_id
-        WHERE u.id = $1
-          AND u.is_active = true
-          AND uam.is_active = true
-        LIMIT 1
-        `,
-        [userId]
-    );
-
-    if (result.rows.length === 0) {
-        throw new Error(`No active ASHA mapping found for user_id: ${userId}`);
-    }
-
-    return result.rows[0];
-};
-
-
-
-// ─── Idempotency ──────────────────────────────────────────────────────────────
-
-/**
- * Check if a request_id has already been processed.
- * Returns the stored response payload if found, or null if this is a new request.
- */
-
-export const findStoredSyncResponse = async (
-    requestId: string,
-    client: PoolClient
-): Promise<Record<string, unknown> | null> => {
-    const result = await client.query(
-        `SELECT response_payload FROM sync_requests WHERE request_id = $1`,
-        [requestId]
-    );
-    return result.rows[0]?.response_payload ?? null;
-};
-
-/**
- * Persist the final response so that repeated requests with the same
- * request_id return an identical answer without re-processing.
- */
-export const storeSyncResponse = async (
-    requestId: string,
-    userId: string,
-    deviceId: string,
-    responsePayload: Record<string, unknown>,
-    client: PoolClient
-): Promise<void> => {
-    await client.query(
-        `INSERT INTO sync_requests (request_id, user_id, device_id, response_payload)
-     VALUES ($1, $2, $3, $4)
-     ON CONFLICT (request_id) DO NOTHING`,
-        [requestId, userId, deviceId, JSON.stringify(responsePayload)]
-    );
-};
-
-// ─── Generic helpers ──────────────────────────────────────────────────────────
-
-/**
- * Fetch a single row by id from any syncable table.
- * Returns null if the row does not exist or is soft-deleted.
- */
-const findRowById = async (
-    table: string,
-    id: string,
-    client: PoolClient
-): Promise<Record<string, unknown> | null> => {
-    // Table name is never user-supplied; it comes from our fixed internal list.
-    const result = await client.query(
-        `SELECT * FROM ${table} WHERE id = $1 AND is_active = true`,
-        [id]
-    );
-    return result.rows[0] ?? null;
-};
 
 
 //ownership field for every table
 
 const ownershipConfig:Record<string,(keyof AshaContext)[]> ={
-    families:["phc_id","asha_id","area_id"],
+    families:["phc_id","asha_id","area_id","last_modified_by","last_modified_role"],
     family_members:[],
     health_records:["phc_id","asha_id","area_id"],
     tasks:[],
 }
 
 
+/**
+ * Process all changes for a single table in order.
+ * Appends results to the provided applied/conflicts arrays.
+ */
 
+export const applyTableChanges = async (
+    table: string,
+    changes: SyncChange[],
+    applied: AppliedEntry[],
+    conflicts: ConflictEntry[],
+    client: PoolClient,
+    asha: AshaContext          // ← server-side ownership + audit context
+): Promise<void> => {
+    for (const change of changes) {
+      
+      const fields = ownershipConfig[table] || [];
 
+        for (const field of fields) {
+            const value = asha[field];
+            if (!value) {
+                throw new Error(`Missing ${field} for table ${table}`);
+            }
+            change.data[field] = value;
+}
+        // ────────────────────────────────────────────────────────────────────────
 
-
+        if (change.operation === "insert") {
+            const outcome = await insertRow(table, change, client, asha);
+            if (outcome === "inserted" || outcome === "skipped") {
+                // Both count as applied — the idempotency case (skipped) means the row
+                // is already there, so the client's intent was fulfilled.
+                applied.push({ table, id: change.id });
+            }
+        } else if (change.operation === "update") {
+            const outcome = await updateRow(table, change, client);
+            if (outcome === "updated") {
+                applied.push({ table, id: change.id });
+            } else {
+                conflicts.push(outcome);
+            }
+        } else {
+            // delete
+            const outcome = await deleteRow(table, change, client);
+            if (outcome === "deleted" || outcome === "skipped") {
+                applied.push({ table, id: change.id });
+            } else {
+                conflicts.push(outcome);
+            }
+        }
+    }
+};
 
 
 
@@ -137,41 +92,76 @@ export const insertRow = async (
 ): Promise<"inserted" | "skipped"> => {
     // Merge caller data but always override sync-critical fields
     const data = { ...change.data };
+    const metadata = { ...change.metadata };
 
     // Build column list and value list dynamically, excluding protected columns
     const PROTECTED = new Set(["id", "version", "is_active", "sync_seq", "created_at", "updated_at"]);
     const userCols = Object.keys(data).filter((k) => !PROTECTED.has(k));
+    const metadataCols = Object.keys(metadata).filter((k) => !PROTECTED.has(k));
 
-    const values: unknown[] = [change.id];
-    for (const col of userCols) {
-        const val = data[col];
-        // Stringify nested objects/arrays so pg doesn't silently fail on jsonb cols
-        values.push(typeof val === "object" && val !== null ? JSON.stringify(val) : val);
-    }
 
-   
 
-    const cleanCols = ["id", ...userCols, "version", "is_active", "sync_seq", "created_at", "updated_at"];
-    const cleanPlaceholders: string[] = [];
-    for (let i = 1; i <= values.length; i++) {
-        cleanPlaceholders.push(`$${i}`);
-    }
-    // Append the unparameterised expressions for controlled fields
-    cleanPlaceholders.push("1");                        // version
-    cleanPlaceholders.push("true");                     // is_active
-    cleanPlaceholders.push("nextval('global_sync_seq')"); // sync_seq
-    cleanPlaceholders.push("NOW()");                    // created_at
-    cleanPlaceholders.push("NOW()");                    // updated_at
+  const values: unknown[] = [change.id, change.version];
 
+// user data
+for (const col of userCols) {
+    const val = data[col];
+    values.push(typeof val === "object" && val !== null ? JSON.stringify(val) : val);
+}
+
+// metadata
+for (const col of metadataCols) {
+    const val = metadata[col];
+    values.push(typeof val === "object" && val !== null ? JSON.stringify(val) : val);
+}
+
+// controlled
+values.push(true);
+
+const cleanCols = [
+    "id",
+    "version",
+    ...userCols,
+    ...metadataCols,
+    "is_active",
+    "sync_seq",
+    "created_at",
+    "updated_at"
+];
+
+const cleanPlaceholders: string[] = [];
+
+// placeholders for values
+for (let i = 1; i <= values.length; i++) {
+    cleanPlaceholders.push(`$${i}`);
+}
+
+// raw SQL expressions
+cleanPlaceholders.push("nextval('global_sync_seq')");
+cleanPlaceholders.push("NOW()");
+cleanPlaceholders.push("NOW()");
+    
     const cleanQuery = `
     INSERT INTO ${table} (${cleanCols.join(", ")})
     VALUES (${cleanPlaceholders.join(", ")})
     ON CONFLICT (id) DO NOTHING
   `;
 
+  try{
     const result = await client.query(cleanQuery, values);
     return result.rowCount && result.rowCount > 0 ? "inserted" : "skipped";
+  } catch (error: any) {
+    console.error("❌ REAL DB ERROR:", error);
+    console.error("❌ QUERY:", cleanQuery);
+    console.error("❌ VALUES:", values);
+    throw error; // 🔥 DO NOT WRAP
+}
 };
+
+
+
+
+
 
 
 
@@ -305,6 +295,10 @@ export const deleteRow = async (
     };
 };
 
+
+
+
+
 // ─── Delta pull ───────────────────────────────────────────────────────────────
 
 const DELTA_LIMIT = 200;
@@ -360,58 +354,176 @@ export const pullAllDeltas = async (
     };
 };
 
-// ─── Apply changes for one table ──────────────────────────────────────────────
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// ─── ASHA ownership fetch ─────────────────────────────────────────────────────
 
 /**
- * Process all changes for a single table in order.
- * Appends results to the provided applied/conflicts arrays.
+ * Fetch the authoritative ASHA record for the authenticated user.
+ * Called ONCE per sync request, BEFORE the transaction begins, so we stay
+ * outside the main pool-client and avoid holding the connection longer.
+ *
+ * Throws if no asha_workers row is found for the given user_id — this means
+ * the JWT belongs to a non-ASHA user who should not be syncing.
  */
-export const applyTableChanges = async (
-    table: string,
-    changes: SyncChange[],
-    applied: AppliedEntry[],
-    conflicts: ConflictEntry[],
-    client: PoolClient,
-    asha: AshaContext          // ← server-side ownership + audit context
-): Promise<void> => {
-    for (const change of changes) {
-        // ── Ownership + audit override ───────────────────────────────────────────
-        // Always replace client-supplied values with server-authoritative ones.
-        // This runs for every operation (insert / update / delete) so no path
-        // can bypass the enforcement.
-      const fields = ownershipConfig[table] || [];
+export const FetchAshaData = async (userId: string): Promise<ashadatatype> => {
+    const result = await pool.query(
+        `
+        SELECT 
+            u.id AS user_id,
+            u.phc_id,
+            u.role,
+            uam.area_id
+        FROM users u
+        JOIN user_area_map uam 
+            ON u.id = uam.user_id
+        WHERE u.id = $1
+          AND u.is_active = true
+          AND uam.is_active = true
+        LIMIT 1
+        `,
+        [userId]
+    );
 
-        for (const field of fields) {
-            const value = asha[field];
-            if (!value) {
-                throw new Error(`Missing ${field} for table ${table}`);
-            }
-            change.data[field] = value;
-}
-        // ────────────────────────────────────────────────────────────────────────
-
-        if (change.operation === "insert") {
-            const outcome = await insertRow(table, change, client, asha);
-            if (outcome === "inserted" || outcome === "skipped") {
-                // Both count as applied — the idempotency case (skipped) means the row
-                // is already there, so the client's intent was fulfilled.
-                applied.push({ table, id: change.id });
-            }
-        } else if (change.operation === "update") {
-            const outcome = await updateRow(table, change, client);
-            if (outcome === "updated") {
-                applied.push({ table, id: change.id });
-            } else {
-                conflicts.push(outcome);
-            }
-        } else {
-            // delete
-            const outcome = await deleteRow(table, change, client);
-            if (outcome === "deleted" || outcome === "skipped") {
-                applied.push({ table, id: change.id });
-            } else {
-                conflicts.push(outcome);
-            }
-        }
+    if (result.rows.length === 0) {
+        throw new Error(`No active ASHA mapping found for user_id: ${userId}`);
     }
+
+    return result.rows[0];
 };
+
+
+
+// ─── Idempotency ──────────────────────────────────────────────────────────────
+
+/**
+ * Check if a request_id has already been processed.
+ * Returns the stored response payload if found, or null if this is a new request.
+ */
+
+export const findStoredSyncResponse = async (
+    requestId: string,
+    client: PoolClient
+): Promise<Record<string, unknown> | null> => {
+    const result = await client.query(
+        `SELECT response_payload FROM sync_requests WHERE request_id = $1`,
+        [requestId]
+    );
+    return result.rows[0]?.response_payload ?? null;
+};
+
+/**
+ * Persist the final response so that repeated requests with the same
+ * request_id return an identical answer without re-processing.
+ */
+export const storeSyncResponse = async (
+    requestId: string,
+    userId: string,
+    deviceId: string,
+    responsePayload: Record<string, unknown>,
+    client: PoolClient
+): Promise<void> => {
+    await client.query(
+        `INSERT INTO sync_requests (request_id, user_id, device_id, response_payload)
+     VALUES ($1, $2, $3, $4)
+     ON CONFLICT (request_id) DO NOTHING`,
+        [requestId, userId, deviceId, JSON.stringify(responsePayload)]
+    );
+};
+
+// ─── Generic helpers ──────────────────────────────────────────────────────────
+
+/**
+ * Fetch a single row by id from any syncable table.
+ * Returns null if the row does not exist or is soft-deleted.
+ */
+const findRowById = async (
+    table: string,
+    id: string,
+    client: PoolClient
+): Promise<Record<string, unknown> | null> => {
+    // Table name is never user-supplied; it comes from our fixed internal list.
+    const result = await client.query(
+        `SELECT * FROM ${table} WHERE id = $1 AND is_active = true`,
+        [id]
+    );
+    return result.rows[0] ?? null;
+};
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// ─── Apply changes for one table ──────────────────────────────────────────────
+

@@ -6,7 +6,8 @@ export interface SyncChange {
     id: string;                        // client-provided UUID
     operation: SyncOperation;
     version: number;                   // client's current version
-    data: Record<string, unknown>;     // field map (empty for delete)
+    data: Record<string, unknown>; 
+    metadata: Record<string, unknown>;    // field map (empty for delete)
 }
 
 // ─── Validated request body ────────────────────────────────────────────────────
@@ -51,8 +52,8 @@ export interface DeltaChanges {
 export interface SyncResponse {
     applied: AppliedEntry[];
     conflicts: ConflictEntry[];
-    changes: DeltaChanges;
-    new_sync_seq: number;
+    // changes: DeltaChanges;
+    // new_sync_seq: number;
 }
 
 
