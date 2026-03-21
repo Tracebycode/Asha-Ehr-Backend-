@@ -82,10 +82,10 @@ export const processSyncService = async (
         
 
         // ── 3. Delta pull ─────────────────────────────────────────────────────────
-        // const { changes: deltaChanges, new_sync_seq } = await pullAllDeltas(
-        //     body.last_sync_seq,
-        //     client
-        // );
+        const { changes: deltaChanges, new_sync_seq } = await pullAllDeltas(
+            body.last_sync_seq,
+            client
+        );
 
 
 
@@ -93,8 +93,8 @@ export const processSyncService = async (
         const response: SyncResponse = {
             applied,
             conflicts,
-            // changes: deltaChanges,
-            // new_sync_seq,
+            changes: deltaChanges,
+            new_sync_seq,
         };
 
         // ── 5. Persist idempotency record inside same transaction ─────────────────

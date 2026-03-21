@@ -44,7 +44,7 @@ export interface DeltaChanges {
     families: Record<string, unknown>[];
     family_members: Record<string, unknown>[];
     health_records: Record<string, unknown>[];
-    tasks: Record<string, unknown>[];
+    //tasks: Record<string, unknown>[];
 }
 
 // ─── Final response sent to client ────────────────────────────────────────────
@@ -52,8 +52,8 @@ export interface DeltaChanges {
 export interface SyncResponse {
     applied: AppliedEntry[];
     conflicts: ConflictEntry[];
-    // changes: DeltaChanges;
-    // new_sync_seq: number;
+    changes: DeltaChanges;
+    new_sync_seq: number;
 }
 
 

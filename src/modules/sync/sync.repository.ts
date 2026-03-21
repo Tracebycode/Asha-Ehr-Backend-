@@ -322,9 +322,11 @@ const pullDelta = async (
             [lastSyncSeq, DELTA_LIMIT]
         );
         return result.rows;
-    } catch {
+    } catch(error) {
+    
         // If the table doesn't have sync_seq (e.g. tasks), return empty array
         return [];
+        throw new AppError("Error fetching delta", 500);
     }
 };
 
@@ -335,21 +337,22 @@ export const pullAllDeltas = async (
     lastSyncSeq: number,
     client: PoolClient
 ): Promise<{ changes: DeltaChanges; new_sync_seq: number }> => {
-    const [families, family_members, health_records, tasks] = await Promise.all([
+
+    const [families, family_members, health_records] = await Promise.all([
         pullDelta("families", lastSyncSeq, client),
         pullDelta("family_members", lastSyncSeq, client),
         pullDelta("health_records", lastSyncSeq, client),
-        pullDelta("tasks", lastSyncSeq, client),
+       
     ]);
 
-    const allRows = [...families, ...family_members, ...health_records, ...tasks];
+    const allRows = [...families, ...family_members, ...health_records];
     const new_sync_seq = allRows.reduce((max, row) => {
         const seq = typeof row.sync_seq === "number" ? row.sync_seq : Number(row.sync_seq ?? 0);
         return seq > max ? seq : max;
     }, lastSyncSeq);
 
     return {
-        changes: { families, family_members, health_records, tasks },
+        changes: { families, family_members, health_records },
         new_sync_seq,
     };
 };
