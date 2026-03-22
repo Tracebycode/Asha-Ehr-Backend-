@@ -10,7 +10,7 @@ import { version } from "node:os";
 
 const ownershipConfig:Record<string,(keyof AshaContext)[]> ={
     families:["phc_id","asha_id","area_id","last_modified_by","last_modified_role"],
-    family_members:[],
+    family_members:["last_modified_by","last_modified_role"],
     health_records:["phc_id","asha_id","area_id"],
     tasks:[],
 }
@@ -126,7 +126,8 @@ const cleanCols = [
     "is_active",
     "sync_seq",
     "created_at",
-    "updated_at"
+    "updated_at",
+    "sync_at"
 ];
 
 const cleanPlaceholders: string[] = [];
@@ -138,6 +139,7 @@ for (let i = 1; i <= values.length; i++) {
 
 // raw SQL expressions
 cleanPlaceholders.push("nextval('global_sync_seq')");
+cleanPlaceholders.push("NOW()");
 cleanPlaceholders.push("NOW()");
 cleanPlaceholders.push("NOW()");
     
