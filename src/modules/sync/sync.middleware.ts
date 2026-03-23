@@ -1,6 +1,6 @@
 import { NextFunction, Request, Response } from "express";
 import AppError from "../../utils/Apperror";
-import { syncRequestSchema } from "./sync.schema";
+import { syncRequestSchema, tableSchemas, metadata_valiationschema } from "./sync.schema";
 
 /**
  * Validate and coerce the incoming sync request body against the Zod schema.
@@ -19,6 +19,25 @@ export const validateSyncRequest = (
 ): void => {
     try {
         const parsed = syncRequestSchema.parse(req.body);
+
+
+         for (const table in parsed.changes) {
+
+    const schema = tableSchemas[table];
+    if (!schema) continue; // tasks skip
+
+    const changes = parsed.changes[table];
+
+    for (const change of changes) {
+      // DELETE → skip data validation
+      if (change.operation === "delete") continue;
+      schema.parse(change.data);
+
+      if (change.metadata) {
+        metadata_valiationschema.partial().strict().parse(change.metadata);
+      }
+    }
+  }
         req.body = parsed;
         next();
     } catch (error: any) {

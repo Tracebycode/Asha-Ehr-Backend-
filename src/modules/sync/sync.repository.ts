@@ -3,6 +3,7 @@ import pool from "../../lib/db";
 import { SyncChange, AppliedEntry, ConflictEntry, DeltaChanges, ashadatatype, AshaContext } from "./sync.types";
 import AppError from "../../utils/Apperror";
 import { version } from "node:os";
+import { object } from "zod";
 
 
 
@@ -14,6 +15,14 @@ const ownershipConfig:Record<string,(keyof AshaContext)[]> ={
     health_records:["phc_id","asha_id","area_id"],
     tasks:[],
 }
+
+const alloweddatafields:Record<string,string[]> ={
+    families:["head_member_id","adress_line","landmark","phc_id","asha_id","area_id","last_modified_by","last_modified_role"],
+    family_members:["family_id","name","gender","relation","dob","adhar_number","phone","next_visit_date"],
+    health_records:["member_id","visit_type","data_json","phc_id","asha_id","area_id"]
+}
+
+const metadatafields:string[] = ["device_created_at","device_updated_at","last_modified_device"]
 
 
 /**
@@ -94,7 +103,26 @@ export const insertRow = async (
     const data = { ...change.data };
     const metadata = { ...change.metadata };
 
-    // Build column list and value list dynamically, excluding protected columns
+   for(const keys of Object.keys(data)){
+    if(alloweddatafields[table].includes(keys)){
+        continue;
+    }
+    else{
+        throw new Error(`Invalid field ${keys} for table ${table}`);
+    }
+   }
+
+   for(const keys of Object.keys(metadata)){
+    if(metadatafields.includes(keys)){
+        continue;
+    }
+    else{
+        throw new Error(`Invalid field ${keys} for table ${table}`);
+    }
+   }
+
+   // Build column list and value list dynamically, excluding protected columns
+    
     const PROTECTED = new Set(["id", "version", "is_active", "sync_seq", "created_at", "updated_at"]);
     const userCols = Object.keys(data).filter((k) => !PROTECTED.has(k));
     const metadataCols = Object.keys(metadata).filter((k) => !PROTECTED.has(k));
@@ -182,6 +210,17 @@ export const updateRow = async (
     const PROTECTED = new Set(["id", "version", "sync_seq", "updated_at", "created_at"]);
     const userCols = Object.keys(data).filter((k) => !PROTECTED.has(k));
 
+    for(const keys of Object.keys(data)){
+    if(alloweddatafields[table].includes(keys)){
+        continue;
+    }
+    else{
+        throw new Error(`Invalid field ${keys} for table ${table}`);
+    }
+   }
+
+
+  
     if (userCols.length === 0) {
         // Nothing to set — treat as conflict-free no-op
         return "updated";
