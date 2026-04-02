@@ -11,6 +11,7 @@ export const syncController = async (
     next: NextFunction
 ): Promise<void> => {
     try {
+        console.log("sync controller hit");
         const user = req.user as userjwtType;
         const body = req.body as SyncRequestBody;
 

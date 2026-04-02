@@ -12,6 +12,7 @@ export const changeSchema = z
         operation: operationEnum,
         version: z.number().int().positive("version must be a positive integer"),
         data: z.record(z.string(), z.any()).default({}),
+        metadata: z.record(z.string(), z.any()).default({}),
     })
     .superRefine((val, ctx) => {
         if (
@@ -64,7 +65,7 @@ export type SyncRequestSchema = z.infer<typeof syncRequestSchema>;
 
 export const familyvaliationschema = z.object({
     head_member_id: z.string().uuid("head_member_id must be a valid UUID"),
-    adress_line: z.string().min(1, "adress_line is required"),
+    address_line: z.string().min(1, "adress_line is required"),
     landmark: z.string().min(1, "landmark is required"),
 })
 
@@ -99,3 +100,6 @@ export const tableSchemas: Record<string, z.ZodSchema<any>> = {
   family_members: family_members_valiationschema.partial().strict(),
   health_records: health_records_valiationschema.partial().strict(),
 };
+
+export type Tablename = keyof SyncRequestSchema["changes"];
+ 

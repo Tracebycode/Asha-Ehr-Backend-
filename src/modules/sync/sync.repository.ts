@@ -17,8 +17,8 @@ const ownershipConfig: Record<string, (keyof AshaContext)[]> = {
 }
 
 const alloweddatafields: Record<string, string[]> = {
-    families: ["head_member_id", "adress_line", "landmark", "phc_id", "asha_id", "area_id", "last_modified_by", "last_modified_role"],
-    family_members: ["family_id", "name", "gender", "relation", "dob", "adhar_number", "phone", "next_visit_date"],
+    families: ["head_member_id", "address_line", "landmark", "phc_id", "asha_id", "area_id", "last_modified_by", "last_modified_role"],
+    family_members: ["family_id", "name", "gender", "relation", "dob", "adhar_number", "phone", "next_visit_date", "last_modified_by", "last_modified_role"],
     health_records: ["member_id", "visit_type", "data_json", "phc_id", "asha_id", "area_id"]
 }
 
@@ -155,7 +155,7 @@ export const insertRow = async (
         "sync_seq",
         "created_at",
         "updated_at",
-        "sync_at"
+        "synced_at"
     ];
 
     const cleanPlaceholders: string[] = [];

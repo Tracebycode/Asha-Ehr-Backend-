@@ -1,6 +1,8 @@
 import { NextFunction, Request, Response } from "express";
 import AppError from "../../utils/Apperror";
 import { syncRequestSchema, tableSchemas, metadata_valiationschema } from "./sync.schema";
+import { Tablename } from "./sync.schema";
+import { object } from "zod";
 
 /**
  * Validate and coerce the incoming sync request body against the Zod schema.
@@ -17,32 +19,34 @@ export const validateSyncRequest = (
     res: Response,
     next: NextFunction
 ): void => {
-    try {
-        const parsed = syncRequestSchema.parse(req.body);
+    try{
+        const parsedobj = syncRequestSchema.parse(req.body);
 
+        for(const table of Object.keys(parsedobj) as Tablename[]){
+            const schema = tableSchemas[table];
+            if(!schema) continue;
 
-         for (const table in parsed.changes) {
+            const changes = parsedobj.changes[table];
 
-    const schema = tableSchemas[table];
-    if (!schema) continue; // tasks skip
+            for(const change of changes){
+                if(change.operation === "delete") continue;
 
-    const changes = parsed.changes[table];
+                schema.parse(change.data);
 
-    for (const change of changes) {
-      // DELETE → skip data validation
-      if (change.operation === "delete") continue;
-      schema.parse(change.data);
-
-      if (change.metadata) {
-        metadata_valiationschema.partial().strict().parse(change.metadata);
-      }
-    }
-  }
-        req.body = parsed;
+                if(change.metadata){
+                    metadata_valiationschema.partial().strict().parse(change.metadata);
+                }
+            }
+        }
+        req.body = parsedobj;
         next();
-    } catch (error: any) {
+
+    }catch(error:any){
         const message =
             error?.errors?.[0]?.message ?? "Invalid sync request body";
         throw new AppError(message, 400);
     }
+
+
+        
 };

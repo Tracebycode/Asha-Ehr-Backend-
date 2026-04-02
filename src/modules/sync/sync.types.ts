@@ -81,3 +81,32 @@ export interface AshaContext {
     last_modified_by: string;
     last_modified_role: string;
 }
+
+
+export interface families_data{
+    id: string;
+    head_member_id: string;
+    adress_line: string;
+    landmark: string;
+    
+}
+
+
+export interface family_members_data{
+    id: string;
+    family_id: string;
+    name: string;
+    gender: string;
+    relation: string;
+    dob: string;
+    adhar_number: string;
+    phone: string;
+    next_visit_date: string;
+}
+
+export interface health_records_data{
+    id: string;
+    member_id: string;
+    visit_type: string;
+    data_json: Record<string, unknown>;
+}
