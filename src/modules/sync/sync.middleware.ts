@@ -22,7 +22,7 @@ export const validateSyncRequest = (
     try{
         const parsedobj = syncRequestSchema.parse(req.body);
 
-        for(const table of Object.keys(parsedobj) as Tablename[]){
+        for(const table of Object.keys(parsedobj.changes) as Tablename[]){
             const schema = tableSchemas[table];
             if(!schema) continue;
 
